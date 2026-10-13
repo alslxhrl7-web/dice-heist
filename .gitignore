@@ -31,3 +31,6 @@ Thumbs.db
 *.aab
 *.unitypackage
 crashlytics-build.properties
+
+# 프로젝트 안에 따로 받아 둔 저장소 사본
+/dice-heist/

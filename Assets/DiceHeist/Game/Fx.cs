@@ -8,15 +8,20 @@ namespace DiceHeist.Game
     /// <summary>프로토타입용 기본 도형·머티리얼·트윈 도우미.</summary>
     public static class Fx
     {
+        /// <summary>Resources 폴더에 있는 기준 머티리얼 이름. 에디터 메뉴 DiceHeist에서 만든다.</summary>
+        public const string BaseMaterialName = "DiceHeistBase";
+
         static Material _base;
         static readonly Dictionary<Color, Material> Cache = new Dictionary<Color, Material>();
 
         public static Material Mat(Color c)
         {
             if (Cache.TryGetValue(c, out var m) && m != null) return m;
+            // 빌드에 셰이더가 포함되도록 에셋으로 둔 기준 머티리얼을 먼저 쓴다
+            if (_base == null) _base = Resources.Load<Material>(BaseMaterialName);
             if (_base == null)
             {
-                // 현재 렌더 파이프라인의 기본 머티리얼을 복제해 쓴다
+                // 에셋이 없으면 현재 렌더 파이프라인의 기본 머티리얼을 복제해 쓴다
                 var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 _base = tmp.GetComponent<Renderer>().sharedMaterial;
                 UnityEngine.Object.DestroyImmediate(tmp);

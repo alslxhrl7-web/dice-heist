@@ -24,7 +24,7 @@ namespace DiceHeist.Game
 
         void Start()
         {
-            if (useRandomSeed) seed = DateTime.UtcNow.Ticks;
+            if (useRandomSeed) seed = DateTime.UtcNow.Ticks % 1000000000L;
 
             // 주사위 물리는 DiceThrower가 필요할 때만 직접 돌린다
             _previousMode = Physics.simulationMode;

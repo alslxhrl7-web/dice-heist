@@ -43,11 +43,32 @@ namespace DiceHeist.EditorTools
             Debug.Log("[DiceHeist] 테이블 씬 생성: " + ScenePath);
         }
 
+        /// <summary>
+        /// 색만 바꿔 쓰는 기준 머티리얼을 에셋으로 만든다. 코드에서만 만든 머티리얼은 빌드에서 셰이더가 빠져 분홍색으로 나온다.
+        /// </summary>
+        [MenuItem("DiceHeist/기준 머티리얼 만들기")]
+        public static void EnsureBaseMaterial()
+        {
+            const string dir = "Assets/DiceHeist/Resources";
+            string path = $"{dir}/{Fx.BaseMaterialName}.mat";
+            if (AssetDatabase.LoadAssetAtPath<Material>(path) != null) return;
+
+            var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var shader = tmp.GetComponent<Renderer>().sharedMaterial.shader;
+            Object.DestroyImmediate(tmp);
+            Directory.CreateDirectory(dir);
+            AssetDatabase.Refresh();
+            AssetDatabase.CreateAsset(new Material(shader) { color = Color.white }, path);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[DiceHeist] 기준 머티리얼 생성: " + path);
+        }
+
         /// <summary>Windows 실행 파일을 Builds/Windows에 만든다.</summary>
         [MenuItem("DiceHeist/Windows 빌드")]
         public static void BuildWindows()
         {
             const string output = "Builds/Windows/DiceHeist.exe";
+            EnsureBaseMaterial();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },
