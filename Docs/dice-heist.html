@@ -1,0 +1,464 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>다이스 하이스트 프로토타입</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap">
+<style>
+/* Layout: one felt table — two opponents on top, the pot in the middle, my big dice and three action buttons at the bottom */
+:root{
+  --bg:#eaf0ea; --felt:#cfe3d6; --felt-edge:#9cc3ad; --card:#fbfcf9; --ink:#1f2a26; --muted:#5a6c64;
+  --line:rgba(31,42,38,.13); --die:#fffdf6; --pip:#26302c; --die-back:#7fae96;
+  --accent:#e2a425; --on-accent:#352503; --raise:#c4426a; --on-raise:#ffffff; --good:#2c8a57; --fold:#8b958f;
+  --display:"Jua","Gowun Dodum",system-ui,sans-serif; --body:"Gowun Dodum",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121a17; --felt:#1d382e; --felt-edge:#2d5545; --card:#19241f; --ink:#ecf2ee; --muted:#9bb2a8;
+  --line:rgba(236,242,238,.13); --die:#f6f1e4; --pip:#222a26; --die-back:#3f7560;
+  --accent:#f0b94b; --on-accent:#2a1d03; --raise:#e0789a; --on-raise:#2a0912; --good:#5fc58d; --fold:#6e7974; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121a17; --felt:#1d382e; --felt-edge:#2d5545; --card:#19241f; --ink:#ecf2ee; --muted:#9bb2a8;
+  --line:rgba(236,242,238,.13); --die:#f6f1e4; --pip:#222a26; --die-back:#3f7560;
+  --accent:#f0b94b; --on-accent:#2a1d03; --raise:#e0789a; --on-raise:#2a0912; --good:#5fc58d; --fold:#6e7974; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:flex;flex-direction:column;gap:16px}
+.num{font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+h1{font-family:var(--display);font-weight:400;font-size:1.9rem;margin:0;line-height:1.1;text-wrap:balance}
+.sub{color:var(--muted);font-size:.9rem;margin:2px 0 0}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:var(--card);border-radius:12px;padding:6px 12px;display:flex;flex-direction:column;min-width:70px}
+.stat b{font-family:var(--display);font-weight:400;font-size:1.15rem}
+.stat span{font-size:.75rem;color:var(--muted);letter-spacing:.02em}
+.table{background:var(--felt);border:2px solid var(--felt-edge);border-radius:28px;padding:18px;display:flex;flex-direction:column;gap:18px}
+.opps{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:540px){.opps{grid-template-columns:1fr}}
+.opp{background:var(--card);border-radius:18px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:12px;border:3px solid transparent;transition:opacity .2s,border-color .2s}
+.opp.turn{border-color:var(--accent)}
+.opp.out{opacity:.55}
+.opp.win{border-color:var(--good)}
+.avatar{width:50px;height:50px;border-radius:50%;background:var(--felt);display:grid;place-items:center;font-size:28px}
+.opp-body{min-width:0;display:flex;flex-direction:column;gap:6px}
+.opp-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.opp-top strong{font-family:var(--display);font-weight:400;font-size:1.15rem}
+.tag{font-size:.78rem;color:var(--muted)}
+.meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.85rem}
+.pill{font-size:.78rem;padding:1px 9px;border-radius:999px;background:var(--line)}
+.pill.raise{background:var(--raise);color:var(--on-raise)}
+.pill.call{background:var(--good);color:var(--card)}
+.pill.fold{background:var(--fold);color:var(--card)}
+.pill.first{background:var(--accent);color:var(--on-accent)}
+.mini{display:flex;gap:5px}
+.opp-hand{font-family:var(--display);font-size:1rem}
+.die{background:var(--die);border-radius:14px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:11%;box-shadow:0 3px 0 rgba(0,0,0,.2);border:3px solid transparent;position:relative}
+.die.sm{width:26px;height:26px;border-radius:7px;border-width:0;padding:3px;box-shadow:0 2px 0 rgba(0,0,0,.2)}
+.die.back{background:var(--die-back)}
+.pip{width:72%;height:72%;border-radius:50%;place-self:center}
+.pip.on{background:var(--pip)}
+.die.rolling{animation:shake .14s infinite}
+@keyframes shake{0%{transform:rotate(-9deg)}50%{transform:rotate(9deg) translateY(-2px)}100%{transform:rotate(-9deg)}}
+.pot{display:flex;justify-content:center;align-items:center;gap:12px}
+.chips{display:flex}
+.chips i{width:22px;height:22px;border-radius:50%;background:var(--accent);border:3px dashed var(--on-accent);margin-left:-8px;opacity:.9}
+.chips i:first-child{margin-left:0}
+.pot b{font-family:var(--display);font-weight:400;font-size:1.6rem}
+.pot span{color:var(--muted);font-size:.85rem}
+.me{background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:14px;border:3px solid transparent}
+.me.turn{border-color:var(--accent)}
+.me.win{border-color:var(--good)}
+.me-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.me-top .avatar{width:40px;height:40px;font-size:22px}
+.me-top strong{font-family:var(--display);font-weight:400;font-size:1.15rem}
+.dice{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding-bottom:18px}
+button.die{width:66px;height:66px;cursor:pointer;font:inherit;color:inherit;transition:transform .15s}
+button.die:disabled{cursor:default}
+button.die.held{border-color:var(--accent);transform:translateY(-6px)}
+button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);font-family:var(--display);font-size:.8rem;color:var(--on-accent);background:var(--accent);border-radius:999px;padding:0 8px;white-space:nowrap}
+button.die.part:not(.held){box-shadow:0 3px 0 rgba(0,0,0,.2),0 0 0 3px var(--felt-edge)}
+button.die:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+@media (max-width:420px){button.die{width:54px;height:54px}.dice{gap:8px}}
+.hand{text-align:center;font-family:var(--display);font-size:1.6rem;line-height:1.2}
+.hand small{display:block;font-family:var(--body);font-size:.85rem;color:var(--muted)}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{font-family:var(--display);font-size:1.05rem;padding:11px 22px;border-radius:999px;border:0;background:var(--bg);color:var(--ink);box-shadow:0 3px 0 var(--line);cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.raise{background:var(--raise);color:var(--on-raise)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.hint{text-align:center;color:var(--muted);font-size:.9rem;margin:0}
+.banner{text-align:center;font-family:var(--display);font-size:1.15rem;background:var(--card);border-radius:14px;padding:10px 14px}
+.banner.win{background:var(--good);color:var(--card)}
+.lower{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:600px){.lower{grid-template-columns:1fr}}
+.panel{background:var(--card);border-radius:18px;padding:14px 16px;min-width:0}
+.panel h2{font-family:var(--display);font-weight:400;font-size:1.1rem;margin:0 0 8px}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:.88rem}
+.log li:first-child{color:var(--ink)}
+.log li{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+td,th{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-weight:400;color:var(--muted);font-size:.78rem;letter-spacing:.03em}
+td.r{text-align:right;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){.die.rolling{animation:none}button.die,.opp{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>다이스 하이스트</h1>
+      <p class="sub">프로토타입 · 브론즈 테이블 · 참가비 10칩</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <section class="table" aria-label="게임 테이블">
+    <div class="opps" id="opps"></div>
+    <div class="pot" id="pot"></div>
+    <div id="banner" hidden></div>
+    <div class="me" id="me"></div>
+  </section>
+
+  <div class="lower">
+    <section class="panel">
+      <h2>진행 기록</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+    <section class="panel">
+      <h2>족보 (높은 순)</h2>
+      <table>
+        <thead><tr><th>족보</th><th>예시</th><th class="r">1회 굴림 확률</th></tr></thead>
+        <tbody>
+          <tr><td>파이브 다이스</td><td class="num">4 4 4 4 4</td><td class="r">0.08%</td></tr>
+          <tr><td>포 다이스</td><td class="num">6 6 6 6 2</td><td class="r">1.93%</td></tr>
+          <tr><td>스트레이트</td><td class="num">2 3 4 5 6</td><td class="r">3.09%</td></tr>
+          <tr><td>풀하우스</td><td class="num">5 5 5 3 3</td><td class="r">3.86%</td></tr>
+          <tr><td>트리플</td><td class="num">2 2 2 5 6</td><td class="r">15.43%</td></tr>
+          <tr><td>투페어</td><td class="num">6 6 3 3 1</td><td class="r">23.15%</td></tr>
+          <tr><td>원페어</td><td class="num">4 4 1 3 6</td><td class="r">46.30%</td></tr>
+          <tr><td>노페어</td><td class="num">1 2 4 5 6</td><td class="r">6.17%</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>
+
+<script>
+const ANTE = 10;
+const NAMES = ['노페어','원페어','투페어','트리플','풀하우스','스트레이트','포 다이스','파이브 다이스'];
+const PIPS = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = ms => new Promise(r => setTimeout(r, reduceMotion ? Math.min(ms, 120) : ms));
+const d6 = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return 1 + (a[0] % 6); };
+const IDX = [0,1,2,3,4];
+
+const players = [
+  {id:'me',  name:'나',     face:'🐰', chips:1000, ai:false},
+  {id:'rac', name:'너구리', face:'🦝', chips:1000, ai:true, bluff:0.25, loose:0.7,  tag:'능글맞은 블러퍼'},
+  {id:'cat', name:'고양이', face:'🐱', chips:1000, ai:true, bluff:0.07, loose:0.45, tag:'냉정한 계산형'},
+];
+const me = players[0];
+players.forEach(p => Object.assign(p, {dice:[1,2,3,4,5], held:[false,false,false,false,false], rerolls:0, folded:false, contrib:0, status:'대기', revealed:false, winner:false, rolling:false, rollIdx:[]}));
+
+let roundNo = 0, starter = 0, pot = 0, phase = 'idle', turn = null, busy = false, pending = null;
+let ctx = {}, banner = null, logs = [];
+const stats = {played:0, won:0, best:-1};
+
+/* ---------- rules ---------- */
+function evaluate(d){
+  const c = [0,0,0,0,0,0,0]; d.forEach(v => c[v]++);
+  const groups = []; for (let v = 6; v >= 1; v--) if (c[v]) groups.push([c[v], v]);
+  groups.sort((a,b) => b[0]-a[0] || b[1]-a[1]);
+  const vals = groups.map(g => g[1]), cnt = groups.map(g => g[0]);
+  if (cnt[0] === 5) return {rank:7, tb:[vals[0]]};
+  if (cnt[0] === 4) return {rank:6, tb:vals};
+  if (groups.length === 5){
+    const s = [...d].sort((a,b)=>a-b).join('');
+    if (s === '12345') return {rank:5, tb:[5]};
+    if (s === '23456') return {rank:5, tb:[6]};
+    return {rank:0, tb:vals};
+  }
+  if (cnt[0] === 3 && cnt[1] === 2) return {rank:4, tb:vals};
+  if (cnt[0] === 3) return {rank:3, tb:vals};
+  if (cnt[0] === 2 && cnt[1] === 2) return {rank:2, tb:vals};
+  return {rank:1, tb:vals};
+}
+function compare(a, b){
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  for (let i = 0; i < Math.max(a.tb.length, b.tb.length); i++){
+    const x = a.tb[i] || 0, y = b.tb[i] || 0;
+    if (x !== y) return x - y;
+  }
+  return 0;
+}
+function partMask(d){
+  const e = evaluate(d); const c = [0,0,0,0,0,0,0]; d.forEach(v => c[v]++);
+  if (e.rank === 5 || e.rank === 7) return d.map(() => true);
+  return d.map(v => c[v] >= 2);
+}
+
+/* ---------- AI ---------- */
+function straightDraw(d){
+  let best = null;
+  for (const T of [[2,3,4,5,6],[1,2,3,4,5]]){
+    const used = new Set();
+    const held = d.map(v => { if (T.includes(v) && !used.has(v)){ used.add(v); return true; } return false; });
+    if (used.size >= 4 && (!best || used.size > best.n)){
+      const miss = T.filter(v => !used.has(v));
+      best = {held, n:used.size, open: miss.length === 1 && (miss[0] === T[0] || miss[0] === T[4])};
+    }
+  }
+  return best;
+}
+function aiHold(d){
+  const e = evaluate(d); const c = [0,0,0,0,0,0,0]; d.forEach(v => c[v]++);
+  if ([7,5,4].includes(e.rank)) return d.map(() => true);
+  if (e.rank === 6 || e.rank === 3) return d.map(v => v === e.tb[0]);
+  if (e.rank === 2) return d.map(v => c[v] === 2);
+  const draw = straightDraw(d);
+  if (e.rank === 1) return (draw && draw.open) ? draw.held : d.map(v => v === e.tb[0]);
+  return draw ? draw.held : d.map(() => false);
+}
+function aiDecide(p, raiseUsed, responding){
+  const r = evaluate(p.dice).rank, R = Math.random();
+  // 리롤 공개 심리전: 한 번도 안 굴린 상대가 있으면 조심스러워진다
+  const scary = players.some(q => q !== p && !q.folded && q.rerolls === 0) ? 0.75 : 1;
+  if (responding){
+    if (r >= 3) return 'call';
+    const pc = r === 2 ? p.loose + 0.25 : r === 1 ? p.loose * 0.5 : p.bluff * 0.5;
+    return R < pc * scary ? 'call' : 'fold';
+  }
+  if (r >= 4) return raiseUsed ? 'call' : 'raise';
+  if (!raiseUsed){
+    if (r === 3) return R < 0.35 * p.loose + 0.1 ? 'raise' : 'call';
+    if (r <= 1 && R < p.bluff) return 'raise';
+    if (r === 2) return 'call';
+    if (r === 1) return R < (p.loose + 0.3) * scary ? 'call' : 'fold';
+    return R < p.loose * 0.3 ? 'call' : 'fold';
+  }
+  if (r === 3) return 'call';
+  if (r === 2) return R < (p.loose + 0.2) * scary ? 'call' : 'fold';
+  if (r === 1) return R < p.loose * 0.5 * scary ? 'call' : 'fold';
+  return R < p.bluff * 0.4 ? 'call' : 'fold';
+}
+
+/* ---------- flow ---------- */
+function log(s){ logs.unshift(s); logs = logs.slice(0, 7); }
+const active = () => players.filter(p => !p.folded);
+
+async function rollAnim(p, idxs){
+  p.rolling = true; p.rollIdx = idxs;
+  const steps = reduceMotion ? 1 : 7;
+  for (let k = 0; k < steps; k++){ idxs.forEach(i => p.dice[i] = d6()); render(); await sleep(70); }
+  p.rolling = false; p.rollIdx = []; render();
+}
+function waitHuman(){ return new Promise(r => { pending = r; }); }
+function resolvePending(v){ const r = pending; pending = null; if (r) r(v); }
+
+async function playRound(){
+  banner = null;
+  players.forEach(p => { if (p.ai && p.chips < ANTE * 4){ p.chips = 1000; log(`${p.name} · 지갑을 새로 채워 왔다 (1,000칩)`); } });
+  if (me.chips < ANTE){ phase = 'broke'; render(); return; }
+  roundNo++; starter = (roundNo - 1) % 3; pot = 0; turn = null;
+  players.forEach(p => {
+    p.chips -= ANTE; pot += ANTE;
+    Object.assign(p, {held:[false,false,false,false,false], rerolls:0, folded:false, contrib:0, status:'대기', revealed:false, winner:false});
+  });
+  log(`${roundNo}판 시작 · 참가비 ${ANTE}칩씩`);
+  phase = 'rolling'; render();
+  await Promise.all(players.map(p => rollAnim(p, IDX)));
+
+  // 남기기
+  phase = 'hold'; turn = me; render();
+  await waitHuman();
+  me.held = [false,false,false,false,false];
+  log(`나 · 리롤 ${me.rerolls}회`);
+
+  phase = 'ai'; render();
+  for (const p of players.filter(q => q.ai)){
+    turn = p; p.status = '굴리는 중'; render();
+    for (let k = 0; k < 2; k++){
+      const h = aiHold(p.dice); const idxs = IDX.filter(i => !h[i]);
+      if (!idxs.length) break;
+      await rollAnim(p, idxs); p.rerolls++; render(); await sleep(220);
+    }
+    p.status = '대기'; log(`${p.name} · 리롤 ${p.rerolls}회`); render();
+    await sleep(250);
+  }
+
+  await betting();
+  await showdown();
+}
+
+function pay(p, amt){ p.chips -= amt; p.contrib += amt; pot += amt; }
+function applyAct(p, act, L){
+  if (act === 'raise' && p.chips < 3 * ANTE - p.contrib) act = 'call';
+  if (act === 'call' && p.chips < L - p.contrib) act = 'fold';
+  if (act === 'fold'){ p.folded = true; p.status = '포기'; log(`${p.name} · 포기`); return {L, raised:false}; }
+  if (act === 'call'){ const c = L - p.contrib; pay(p, c); p.status = '따라가기'; log(`${p.name} · 따라가기 (+${c})`); return {L, raised:false}; }
+  const c = 3 * ANTE - p.contrib; pay(p, c); p.status = '올리기'; log(`${p.name} · 올리기 (+${c})`);
+  return {L: 3 * ANTE, raised:true};
+}
+async function decide(p, raiseUsed, responding, L){
+  turn = p;
+  if (p.ai){ phase = 'betting'; render(); await sleep(700); return aiDecide(p, raiseUsed, responding); }
+  phase = responding ? 'respond' : 'bet'; ctx = {L, raiseUsed}; render();
+  const a = await waitHuman(); phase = 'betting'; return a;
+}
+async function betting(){
+  const order = [0,1,2].map(i => players[(starter + i) % 3]);
+  let L = ANTE, raiser = null;
+  for (const p of order){
+    if (p.folded) continue;
+    if (active().length === 1) break;
+    const act = await decide(p, raiser !== null, false, L);
+    const res = applyAct(p, act, L); L = res.L; if (res.raised) raiser = p;
+    render();
+  }
+  if (raiser){
+    for (const p of order){
+      if (p.folded || p === raiser || p.contrib >= L) continue;
+      if (active().length === 1) break;
+      const act = await decide(p, true, true, L);
+      applyAct(p, act, L); render();
+    }
+  }
+  turn = null;
+}
+async function showdown(){
+  const alive = active();
+  phase = 'result'; stats.played++;
+  if (alive.length === 1){
+    const w = alive[0]; w.chips += pot; w.winner = true;
+    banner = {win: w === me, text: `${w.name} 승리 · 나머지가 모두 포기 · +${pot}칩`};
+    log(`${w.name} · 판돈 ${pot}칩 획득 (공개 없이)`);
+    if (w === me) stats.won++;
+  } else {
+    alive.forEach(p => p.revealed = true);
+    render(); await sleep(450);
+    const evs = alive.map(p => ({p, e: evaluate(p.dice)}));
+    evs.sort((a,b) => compare(b.e, a.e));
+    const winners = evs.filter(x => compare(x.e, evs[0].e) === 0).map(x => x.p);
+    const share = Math.floor(pot / winners.length), rem = pot - share * winners.length;
+    winners.forEach((w, i) => { w.chips += share + (i === 0 ? rem : 0); w.winner = true; });
+    const hn = NAMES[evs[0].e.rank];
+    banner = {win: winners.includes(me), text: winners.length > 1
+      ? `무승부 · ${winners.map(w=>w.name).join(', ')} · ${hn} · ${share}칩씩 나눔`
+      : `${winners[0].name} 승리 · ${hn} · +${pot}칩`};
+    log(`쇼다운 · ${evs.map(x => `${x.p.name} ${NAMES[x.e.rank]}`).join(' / ')}`);
+    if (winners.includes(me)) stats.won++;
+  }
+  if (!me.folded) stats.best = Math.max(stats.best, evaluate(me.dice).rank);
+  render();
+  const nb = document.querySelector('[data-act="next"]'); if (nb) nb.focus({preventScroll:true});
+}
+
+/* ---------- view ---------- */
+function dieFace(v){ const on = PIPS[v] || []; let s = ''; for (let i = 0; i < 9; i++) s += `<span class="pip${on.includes(i) ? ' on' : ''}"></span>`; return s; }
+function statusPill(p){
+  const cls = {'올리기':'raise','따라가기':'call','포기':'fold'}[p.status] || '';
+  return `<span class="pill ${cls}">${p.status}</span>`;
+}
+function render(){
+  const rate = stats.played ? Math.round(stats.won / stats.played * 100) : 0;
+  document.getElementById('stats').innerHTML = [
+    ['내 칩', me.chips.toLocaleString()], ['판', roundNo], ['승률', `${rate}%`], ['최고 족보', stats.best >= 0 ? NAMES[stats.best] : '-']
+  ].map(([k,v]) => `<div class="stat"><span>${k}</span><b class="num">${v}</b></div>`).join('');
+
+  document.getElementById('opps').innerHTML = players.filter(p => p.ai).map(p => `
+    <div class="opp ${turn === p ? 'turn' : ''} ${p.folded ? 'out' : ''} ${p.winner ? 'win' : ''}">
+      <div class="avatar" aria-hidden="true">${p.face}</div>
+      <div class="opp-body">
+        <div class="opp-top"><strong>${p.name}</strong><span class="tag">${p.tag}</span></div>
+        <div class="meta"><span class="num">${p.chips.toLocaleString()}칩</span>
+          <span class="pill">리롤 ${p.rerolls}회</span>${statusPill(p)}
+          ${players[starter] === p && roundNo ? '<span class="pill first">선</span>' : ''}</div>
+        <div class="mini" aria-label="${p.revealed ? '공개된 주사위 ' + p.dice.join(', ') : '숨겨진 주사위'}">
+          ${p.dice.map(v => p.revealed ? `<span class="die sm">${dieFace(v)}</span>` : `<span class="die sm back ${p.rolling ? 'rolling' : ''}"></span>`).join('')}
+        </div>
+        ${p.revealed ? `<div class="opp-hand">${NAMES[evaluate(p.dice).rank]}</div>` : ''}
+      </div>
+    </div>`).join('');
+
+  const nChips = Math.min(8, Math.max(1, Math.round(pot / 20)));
+  document.getElementById('pot').innerHTML = `<span class="chips" aria-hidden="true">${'<i></i>'.repeat(nChips)}</span><b class="num">${pot}</b><span>판돈</span>`;
+
+  const bn = document.getElementById('banner');
+  bn.hidden = !banner;
+  if (banner){ bn.className = 'banner' + (banner.win ? ' win' : ''); bn.textContent = banner.text; }
+
+  const e = evaluate(me.dice), parts = partMask(me.dice);
+  const holdable = phase === 'hold' && !busy;
+  let controls = '', hint = '';
+  if (phase === 'rolling'){ hint = '주사위를 굴리는 중…'; }
+  else if (phase === 'hold'){
+    const left = 2 - me.rerolls, all = me.held.every(Boolean);
+    hint = '남길 주사위를 눌러 고정하고, 나머지를 다시 굴리세요.';
+    controls = `<button class="btn" data-act="reroll" ${all || busy ? 'disabled' : ''}>다시 굴리기 · ${left}회 남음</button>
+      <button class="btn primary" data-act="stand" ${busy ? 'disabled' : ''}>이대로 확정</button>`;
+  }
+  else if (phase === 'ai'){ hint = '상대가 주사위를 다시 굴리는 중…'; }
+  else if (phase === 'betting'){ hint = turn ? `${turn.name} 차례…` : ''; }
+  else if (phase === 'bet'){
+    const callCost = ctx.L - me.contrib, raiseCost = 3 * ANTE - me.contrib;
+    hint = ctx.raiseUsed ? '누군가 올렸습니다. 따라가려면 올린 만큼 내야 합니다.' : '포기하거나, 따라가거나, 올리세요. 올리기는 판당 한 명만.';
+    controls = `<button class="btn" data-act="fold">포기</button>
+      <button class="btn primary" data-act="call" ${me.chips < callCost ? 'disabled' : ''}>따라가기 +${callCost}</button>
+      ${ctx.raiseUsed ? '' : `<button class="btn raise" data-act="raise" ${me.chips < raiseCost ? 'disabled' : ''}>올리기 +${raiseCost}</button>`}`;
+  }
+  else if (phase === 'respond'){
+    const c = ctx.L - me.contrib;
+    hint = '내 뒤에서 올리기가 나왔습니다. 차액을 내고 따라갈까요?';
+    controls = `<button class="btn" data-act="fold">포기</button>
+      <button class="btn primary" data-act="call" ${me.chips < c ? 'disabled' : ''}>따라가기 +${c}</button>`;
+  }
+  else if (phase === 'result'){ hint = ''; controls = `<button class="btn primary" data-act="next">다음 판</button>`; }
+  else if (phase === 'broke'){
+    hint = '칩이 바닥났습니다. 실제 게임에서는 싱글로 돌아가 다시 벌어야 합니다.';
+    controls = `<button class="btn primary" data-act="rescue">구제 칩 받기 +100</button>`;
+  }
+
+  const meEl = document.getElementById('me');
+  meEl.className = 'me' + (turn === me && ['hold','bet','respond'].includes(phase) ? ' turn' : '') + (me.winner ? ' win' : '');
+  meEl.innerHTML = `
+    <div class="me-top"><div class="avatar" aria-hidden="true">${me.face}</div><strong>나</strong>
+      <span class="pill">리롤 ${me.rerolls}회</span>${statusPill(me)}
+      ${players[starter] === me && roundNo ? '<span class="pill first">선</span>' : ''}</div>
+    <div class="dice">${me.dice.map((v, i) => `<button class="die ${me.held[i] ? 'held' : ''} ${me.rolling && me.rollIdx.includes(i) ? 'rolling' : ''} ${parts[i] && phase !== 'rolling' ? 'part' : ''}"
+      data-die="${i}" aria-pressed="${me.held[i]}" aria-label="주사위 ${v}${me.held[i] ? ', 고정됨' : ''}" ${holdable ? '' : 'disabled'}>${dieFace(v)}</button>`).join('')}</div>
+    <div class="hand">${phase === 'rolling' ? '…' : NAMES[e.rank]}<small>지금 내 족보</small></div>
+    <div class="controls">${controls}</div>
+    ${hint ? `<p class="hint">${hint}</p>` : ''}`;
+
+  document.getElementById('log').innerHTML = logs.map(l => `<li>${l}</li>`).join('');
+}
+
+document.addEventListener('click', async e => {
+  const dieBtn = e.target.closest('[data-die]');
+  if (dieBtn && !dieBtn.disabled && phase === 'hold' && !busy){
+    const i = +dieBtn.dataset.die; me.held[i] = !me.held[i]; render();
+    document.querySelector(`[data-die="${i}"]`)?.focus({preventScroll:true});
+    return;
+  }
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const act = b.dataset.act;
+  if (phase === 'hold'){
+    if (act === 'stand') resolvePending();
+    else if (act === 'reroll'){
+      const idxs = IDX.filter(i => !me.held[i]); if (!idxs.length) return;
+      busy = true; render();
+      await rollAnim(me, idxs); me.rerolls++; busy = false;
+      if (me.rerolls >= 2) resolvePending(); else render();
+    }
+  } else if (phase === 'bet' || phase === 'respond'){
+    resolvePending(act);
+  } else if (act === 'next' && phase === 'result'){
+    playRound();
+  } else if (act === 'rescue' && phase === 'broke'){
+    me.chips += 100; log('구제 칩 100칩을 받았다'); playRound();
+  }
+});
+
+render();
+playRound();
+</script>
+
+</body></html>

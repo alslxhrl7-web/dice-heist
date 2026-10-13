@@ -1,0 +1,23 @@
+{
+    "name": "DiceHeist.Tests.PlayMode",
+    "rootNamespace": "DiceHeist.Tests",
+    "references": [
+        "DiceHeist.Core",
+        "DiceHeist.Game",
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
