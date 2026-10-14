@@ -22,6 +22,10 @@ namespace DiceHeist.Game
 
         const string SaveKey = "DiceHeist.Chips";
         const string MoneyKey = "DiceHeist.CyberMoney";
+        const string ClearedKey = "DiceHeist.BronzeCleared";
+
+        /// <summary>브론즈 한도에 한 번이라도 닿았는지. 닿으면 멀티가 열린다.</summary>
+        public bool BronzeCleared { get; private set; }
         bool Saving => UseSave && !AutoPlay;
 
         public TableDirector Director { get; private set; }
@@ -78,6 +82,7 @@ namespace DiceHeist.Game
             Chips = Saving && PlayerPrefs.HasKey(SaveKey) ? PlayerPrefs.GetInt(SaveKey) : TableConfig.Bronze.StartChips;
             // PlayerPrefs에는 long이 없어 문자열로 둔다
             CyberMoney = Saving && long.TryParse(PlayerPrefs.GetString(MoneyKey, "0"), out var m) ? m : 0;
+            BronzeCleared = Saving && PlayerPrefs.GetInt(ClearedKey, 0) == 1;
             Director = gameObject.AddComponent<TableDirector>();
             Director.ChipsChanged += chips =>
             {
@@ -99,7 +104,7 @@ namespace DiceHeist.Game
         void ShowTableSelect()
         {
             Hud.Canvas.enabled = false;
-            StartScreen = StartScreen.Build(Hud.Font, Chips, CyberMoney);
+            StartScreen = StartScreen.Build(Hud.Font, Chips, CyberMoney, BronzeCleared);
             StartScreen.TableChosen += Sit;
             StartScreen.ExchangeRequested += () =>
             {
@@ -114,6 +119,7 @@ namespace DiceHeist.Game
             {
                 Chips = TableConfig.Bronze.StartChips;
                 CyberMoney = 0;
+                BronzeCleared = false;
                 Save();
                 StartScreen.Close();
                 ShowTableSelect();
@@ -123,8 +129,10 @@ namespace DiceHeist.Game
         /// <summary>내 칩을 이 PC에 저장한다(PlayerPrefs, Windows에서는 레지스트리). 칩이 바뀔 때마다 바로 쓴다.</summary>
         void Save()
         {
+            if (TableConfig.ClearsBronze(Chips)) BronzeCleared = true;
             if (!Saving) return;
             PlayerPrefs.SetInt(SaveKey, Chips);
+            PlayerPrefs.SetInt(ClearedKey, BronzeCleared ? 1 : 0);
             PlayerPrefs.SetString(MoneyKey, CyberMoney.ToString());
             PlayerPrefs.Save();
         }

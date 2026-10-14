@@ -27,14 +27,16 @@ namespace DiceHeist.Game
         TMP_FontAsset _font;
         int _chips;
         long _money;
+        bool _multiOpen;
 
-        public static StartScreen Build(TMP_FontAsset font, int chips, long money)
+        public static StartScreen Build(TMP_FontAsset font, int chips, long money, bool multiOpen)
         {
             var go = new GameObject("StartScreen", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var screen = go.AddComponent<StartScreen>();
             screen._font = font;
             screen._chips = chips;
             screen._money = money;
+            screen._multiOpen = multiOpen;
             screen.Canvas = go.GetComponent<Canvas>();
             screen.Canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             screen.Canvas.sortingOrder = 10;
@@ -77,9 +79,16 @@ namespace DiceHeist.Game
                     : "<color=#8b958f>칩이 모자람</color>";
                 string label = $"<size=36><b>{cfg.Name}</b></size>\n앤티 {cfg.Ante}칩 · 한도 {cfg.ChipCap:N0}칩\n{state}";
                 var btn = Button(card, "Btn_table" + i, label, open ? Accent : Locked,
-                    new Vector2((i - 1) * 300, 118), new Vector2(280, 170), 22, () => TableChosen?.Invoke(cfg));
+                    new Vector2(-345 + i * 230, 118), new Vector2(220, 170), 21, () => TableChosen?.Invoke(cfg));
                 btn.interactable = open;
             }
+
+            // 멀티: 브론즈 한도에 한 번이라도 닿으면 열린다. 사이버머니로 사람끼리 겨루는 곳(사이트에서, 아직 준비 중)
+            string multiState = _multiOpen ? "<color=#2c8a57>열림</color> · 준비 중"
+                : $"<color=#8b958f>브론즈 {TableConfig.Bronze.ChipCap:N0}칩 달성 시</color>";
+            var multi = Button(card, "Btn_multi", $"<size=36><b>멀티</b></size>\n사이버머니로 사람과\n{multiState}",
+                Locked, new Vector2(345, 118), new Vector2(220, 170), 21, () => { });
+            multi.interactable = false;
 
             Button(card, "Btn_quit", "나가기", Plain, new Vector2(-300, 30), new Vector2(180, 60), 24, Application.Quit);
 

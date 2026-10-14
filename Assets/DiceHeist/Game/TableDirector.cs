@@ -262,7 +262,9 @@ namespace DiceHeist.Game
             var cfg = _game.Config;
             if (res.OverCap > 0) Log($"{cfg.Name} 한도 {cfg.ChipCap:N0}칩 · 넘친 {res.OverCap}칩은 못 받음");
             var up = TableConfig.Tiers.FirstOrDefault(t => t.MinChips > cfg.MinChips && t.CanEnter(me.Chips));
-            if (me.Chips >= cfg.ChipCap)
+            if (cfg.Name == TableConfig.Bronze.Name && TableConfig.ClearsBronze(me.Chips))
+                _hud.SetHint("브론즈를 지났습니다! 멀티가 열렸어요. 칩을 사이버머니로 환전해 멀티에서 쓸 수 있습니다.");
+            else if (me.Chips >= cfg.ChipCap)
                 _hud.SetHint(up != null ? $"{cfg.Name} 한도에 닿았습니다. 테이블 선택에서 {up.Name}로 올라가세요." : $"{cfg.Name} 한도에 닿았습니다.");
             else if (up != null)
                 _hud.SetHint($"{up.Name} 테이블에 앉을 수 있습니다 ({up.MinChips:N0}칩 이상). 테이블 선택에서 옮길 수 있어요.");

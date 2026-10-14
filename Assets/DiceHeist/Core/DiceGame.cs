@@ -40,6 +40,9 @@ namespace DiceHeist.Core
             AiMaxRerolls = 1, AiMisread = 0.9,
         };
 
+        /// <summary>브론즈 한도에 한 번이라도 닿으면(브론즈를 지나면) 멀티가 열린다.</summary>
+        public static bool ClearsBronze(int chips) => chips >= Bronze.ChipCap;
+
         /// <summary>700칩 이상 가지고 있어야 입장, 1,500칩까지. AI는 다시 굴리기 2회에 배짱은 절반.</summary>
         public static TableConfig Silver => new TableConfig
         {

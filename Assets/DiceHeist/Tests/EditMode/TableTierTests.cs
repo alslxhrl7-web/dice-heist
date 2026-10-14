@@ -48,6 +48,13 @@ namespace DiceHeist.Tests
             Assert.AreEqual(gold, TableConfig.Gold.CanEnter(chips), "골드");
         }
 
+        [TestCase(999, false)]
+        [TestCase(1000, true)]
+        public void 브론즈_한도에_닿으면_멀티가_열린다(int chips, bool open)
+        {
+            Assert.AreEqual(open, TableConfig.ClearsBronze(chips));
+        }
+
         [Test]
         public void 브론즈는_500칩으로_시작한다()
         {
