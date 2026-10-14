@@ -16,6 +16,11 @@ namespace DiceHeist.Tests
     {
         const int Rounds = 4;
 
+        HashSet<GameObject> _before;
+
+        [SetUp]
+        public void SetUp() => _before = new HashSet<GameObject>(SceneManager.GetActiveScene().GetRootGameObjects());
+
         [UnityTearDown]
         public IEnumerator TearDown()
         {
@@ -23,9 +28,11 @@ namespace DiceHeist.Tests
             GameBootstrap.AutoPlay = false;
             GameBootstrap.UseSave = true;
             GameBootstrap.UseServer = true;
-            // 다음 테스트에 테이블·UI·카메라가 겹쳐 남지 않게 치운다.
+            // 다음 테스트에 테이블·UI·카메라가 겹쳐 남지 않게 테스트가 만든 것만 치운다.
+            // 원래 있던 것(테스트 러너 오브젝트)까지 지우면 실행이 멈추고 결과 파일이 나오지 않는다.
             // Destroy는 프레임 끝에 일어나므로 한 프레임 기다려야, 다음 테스트가 사라질 카메라를 집어 쓰지 않는다
-            foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects()) Object.Destroy(go);
+            foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects())
+                if (!_before.Contains(go)) Object.Destroy(go);
             yield return null;
         }
 
