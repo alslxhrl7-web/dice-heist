@@ -52,6 +52,7 @@ namespace DiceHeist.Game
         };
 
         public Canvas Canvas { get; private set; }
+        public Font Font => _font;
         public event Action<string> ButtonClicked;
 
         Font _font;

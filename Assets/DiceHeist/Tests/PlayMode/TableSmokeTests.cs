@@ -4,7 +4,9 @@ using System.IO;
 using DiceHeist.Game;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace DiceHeist.Tests
 {
@@ -18,6 +20,30 @@ namespace DiceHeist.Tests
         {
             Time.timeScale = 1f;
             GameBootstrap.AutoPlay = false;
+            // 다음 테스트에 테이블·UI가 겹쳐 남지 않게 치운다
+            foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects()) Object.Destroy(go);
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator 시작_화면에서_시작을_누르면_게임이_시작된다()
+        {
+            var boot = new GameObject("GameBootstrap").AddComponent<GameBootstrap>();
+            boot.useRandomSeed = false;
+            yield return null;
+            yield return null;
+
+            Assert.IsNotNull(boot.StartScreen, "시작 화면이 먼저 떠야 한다");
+            Assert.AreEqual("idle", boot.Director.Phase, "시작을 누르기 전에는 게임이 진행되지 않는다");
+            Assert.IsFalse(boot.Hud.Canvas.enabled);
+            yield return Capture(boot.Cam, boot.StartScreen.Canvas, "start");
+
+            boot.StartScreen.transform.Find("Card/Btn_start").GetComponent<Button>().onClick.Invoke();
+            yield return null;
+            yield return null;
+
+            Assert.IsTrue(boot.StartScreen == null);
+            Assert.IsTrue(boot.Hud.Canvas.enabled);
+            Assert.AreNotEqual("idle", boot.Director.Phase);
         }
 
         [UnityTest, Timeout(600000)]
@@ -43,7 +69,7 @@ namespace DiceHeist.Tests
                 {
                     // 연출이 조금 진행된 뒤의 화면을 남긴다
                     yield return new WaitForSeconds(phase == "result" ? 0.3f : 0.65f);
-                    yield return Capture(boot, key);
+                    yield return Capture(boot.Cam, boot.Hud.Canvas, key);
                 }
                 yield return null;
             }
@@ -55,14 +81,11 @@ namespace DiceHeist.Tests
                 total += p.Chips;
             }
             Assert.AreEqual(3000, total, "지갑 채우기가 없었다면 칩 총량은 그대로여야 한다");
-            Object.Destroy(boot.gameObject);
         }
 
-        static IEnumerator Capture(GameBootstrap boot, string name)
+        static IEnumerator Capture(Camera cam, Canvas canvas, string name)
         {
             const int w = 1600, h = 900;
-            var cam = boot.Cam;
-            var canvas = boot.Hud.Canvas;
             var rt = new RenderTexture(w, h, 24);
             float scale = Time.timeScale;
             Time.timeScale = 0f;

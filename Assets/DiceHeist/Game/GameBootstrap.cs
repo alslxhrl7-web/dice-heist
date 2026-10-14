@@ -19,6 +19,8 @@ namespace DiceHeist.Game
         public TableScene Scene { get; private set; }
         public HudView Hud { get; private set; }
         public Camera Cam { get; private set; }
+        /// <summary>시작 화면. 게임이 시작되면 null이 된다.</summary>
+        public StartScreen StartScreen { get; private set; }
 
         SimulationMode _previousMode;
 
@@ -61,7 +63,22 @@ namespace DiceHeist.Game
 
             var game = new DiceGame(TableConfig.Bronze, new SeededRandom(seed));
             Director = gameObject.AddComponent<TableDirector>();
-            Director.Begin(game, Scene, Hud, seed, AutoPlay);
+            if (AutoPlay)
+            {
+                Director.Begin(game, Scene, Hud, seed, true);
+                return;
+            }
+
+            // 시작 화면을 먼저 보여주고, 시작을 누르면 테이블로 넘어간다
+            Hud.Canvas.enabled = false;
+            StartScreen = StartScreen.Build(Hud.Font);
+            StartScreen.StartClicked += () =>
+            {
+                StartScreen.Close();
+                StartScreen = null;
+                Hud.Canvas.enabled = true;
+                Director.Begin(game, Scene, Hud, seed, false);
+            };
         }
 
         void OnDestroy()
