@@ -129,6 +129,20 @@ namespace DiceHeist.Server.Tests
             Assert.AreEqual(0, db.TotalMoney() - (db.GetUser(1).Money + db.GetUser(2).Money), "테이블에 남은 머니가 없다");
         }
 
+        [Test, Timeout(60000)]
+        public async Task 방에는_여섯_명까지_앉고_일곱_번째는_거절된다()
+        {
+            var players = new List<Player>();
+            for (int i = 0; i < 7; i++) players.Add(await SignUp("손님" + i));
+            Assert.IsNull(await players[0].Hub.InvokeAsync<string>("CreateRoom", "큰 방"));
+            var roomId = (await WaitFor(players[0], s => true, "방 상태")).GetProperty("room").GetProperty("id").GetString();
+            for (int i = 1; i < 6; i++)
+                Assert.IsNull(await players[i].Hub.InvokeAsync<string>("JoinRoom", roomId), $"{i + 1}번째 사람");
+            StringAssert.Contains("꽉", await players[6].Hub.InvokeAsync<string>("JoinRoom", roomId));
+            var s0 = await WaitFor(players[0], s => s.GetProperty("seats").GetArrayLength() == 6, "6명");
+            Assert.AreEqual(6, s0.GetProperty("seats").GetArrayLength());
+        }
+
         [Test]
         public async Task 브론즈를_안_지났으면_멀티에_앉을_수_없다()
         {

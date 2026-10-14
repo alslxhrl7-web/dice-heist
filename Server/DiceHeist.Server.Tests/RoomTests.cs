@@ -136,6 +136,32 @@ namespace DiceHeist.Server.Tests
         }
 
         [Test]
+        public void 여섯_명이_한_판을_끝까지_두고_칩은_그대로()
+        {
+            for (int i = 3; i <= Room.MaxSeats; i++) _room.Sit(Seat(i, "손님" + i));
+            Assert.AreEqual(6, _room.Seats.Count);
+            StartRound();
+            foreach (var s in _room.Seats) Assert.IsNull(_room.Stand(s, _now));
+            Assert.AreEqual("betting", _room.Phase);
+
+            // 차례가 온 사람마다 콜한다
+            for (int guard = 0; guard < 20 && _room.Phase == "betting"; guard++)
+                Assert.IsNull(_room.Bet(CurrentBettor(), "call", _now));
+            Assert.AreEqual("result", _room.Phase);
+            Assert.AreEqual(6 * Room.BuyIn, _room.Seats.Sum(s => s.Stack));
+        }
+
+        [Test]
+        public void 판_중에_들어온_사람은_다음_판부터()
+        {
+            StartRound();
+            var late = Seat(9, "늦게온");
+            _room.Sit(late);
+            Assert.AreEqual(JsonValueKind.False, SeatState(late, late).GetProperty("inHand").ValueKind);
+            Assert.IsNotNull(_room.Stand(late, _now), "이번 판에는 조작할 수 없다");
+        }
+
+        [Test]
         public void 대기_중에_나가면_바로_일어난다()
         {
             Assert.IsTrue(_room.Leave(_a, _now));

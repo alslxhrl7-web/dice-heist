@@ -34,7 +34,8 @@ namespace DiceHeist.Server.Multi
     /// </summary>
     public sealed class Room
     {
-        public const int MaxSeats = 3;
+        /// <summary>방 하나에 앉을 수 있는 최대 인원. 2명이 모이면 시작하고, 판 중에 들어온 사람은 다음 판부터 낀다.</summary>
+        public const int MaxSeats = 6;
         /// <summary>앉을 때 머니에서 테이블로 가져가는 금액(앤티 50번분).</summary>
         public const int BuyIn = 50_000;
 

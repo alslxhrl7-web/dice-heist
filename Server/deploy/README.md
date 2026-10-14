@@ -85,7 +85,15 @@ powershell -ExecutionPolicy Bypass -File .\Server\deploy\install-service.ps1
 
 ### 1-7. 코드를 고친 뒤 새 버전으로 바꾸기
 
-1-2(관리자 PowerShell 열기) → 1-3(폴더 이동) → 1-4(같은 명령 실행)를 그대로 다시 하면 됩니다. 서비스를 멈추고, 새로 빌드하고, 다시 켭니다. 계정·사이버머니가 든 DB는 지워지지 않습니다.
+**쉬운 방법:** 파일 탐색기에서 저장소 폴더의 `Server\deploy\update-service.cmd`를 **더블클릭**합니다.
+1. "이 앱이 디바이스를 변경하도록 허용하시겠어요?" 창이 뜨면 **예**.
+2. 검은 창에 "서비스 멈추는 중… → 빌드 중… → …"이 1~2분 흐릅니다.
+3. 마지막에 "(테스트 머니 버튼: False)"가 보이고 "계속하려면 아무 키나 누르십시오"가 나오면 끝입니다. 아무 키나 눌러 창을 닫습니다.
+4. 사이트를 **Ctrl+F5**로 새로고침해 바뀐 것을 확인합니다.
+
+**직접 하는 방법:** 1-2(관리자 PowerShell 열기) → 1-3(폴더 이동) → 1-4(같은 명령 실행)를 그대로 다시 하면 됩니다.
+
+어느 쪽이든 서비스를 멈추고, 새로 빌드하고, 다시 켭니다. 계정·사이버머니가 든 DB는 지워지지 않습니다. 업데이트하는 1~2분 동안만 사이트가 꺼지고, 그때 멀티 테이블에 앉아 있던 사람의 stack은 서버가 다시 켜질 때 머니로 돌려줍니다.
 
 ### 1-8. 테스트 머니 끄기 · 서비스 지우기
 
@@ -160,7 +168,23 @@ PC가 절전 모드에 들어가면 서버도 멈춥니다. 모니터가 꺼지�
 2. 지금 상태를 다시 보고 싶으면 PowerShell에서 `tailscale funnel status`.
 3. 외부 접속을 끄고 싶으면 `tailscale funnel --https=443 off`.
 
-`--bg`로 켠 Funnel은 Tailscale이 기억하므로, PC를 다시 켜도 저절로 다시 열립니다. Tailscale도 Windows 서비스로 설치돼서 로그인 전에도 돌아갑니다.
+`--bg`로 켠 Funnel은 Tailscale이 기억하므로, PC를 다시 켜도 저절로 다시 열립니다.
+
+### 3-3-1. Windows에 로그인하지 않아도 열려 있게 하기 (무인 모드)
+
+서버(DiceHeist 서비스)는 Windows 로그인과 상관없이 돕니다. 하지만 Tailscale은 기본 설정에서 **로그인한 사용자에 묶여 있어서**, 재부팅 후 로그인 화면에 머물러 있거나 로그아웃하면 바깥 주소가 끊깁니다. 무인 모드를 켜면 로그인 전에도 연결됩니다.
+
+1. 작업 표시줄 오른쪽 아래 `^`를 눌러 **Tailscale 아이콘**을 오른쪽 클릭합니다.
+2. **Settings**(설정) → **Run unattended**(무인 실행)를 눌러 체크합니다. 확인 창이 뜨면 **Yes**.
+   - 메뉴에 없으면 일반 PowerShell에서 대신 실행합니다.
+     ```powershell
+     & "C:\Program Files\Tailscale\tailscale.exe" set --unattended
+     ```
+3. 확인: PowerShell에서 아래를 실행해 `"ForceDaemon": true`가 보이면 켜진 것입니다.
+   ```powershell
+   & "C:\Program Files\Tailscale\tailscale.exe" debug prefs | Select-String ForceDaemon
+   ```
+4. 진짜로 확인하려면 PC를 다시 시작하고 **로그인하지 않은 채로** 휴대폰(LTE)에서 주소를 열어 봅니다.
 
 ### 3-4. 이럴 땐
 
