@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace DiceHeist.Game
 {
     /// <summary>
-    /// 큰 족보(스트레이트, 파이브 다이스)가 나왔을 때 화면 전체에 띄우는 축하 연출: 번쩍임, 튀어나오는 제목, 양쪽 아래에서 쏘는 색종이.
+    /// 큰 족보(스트레이트, 포 다이스, 파이브 다이스)가 나왔을 때 화면 전체에 띄우는 축하 연출: 번쩍임, 튀어나오는 제목, 양쪽 아래에서 쏘는 색종이.
     /// 화면 위에 덮이지만 클릭은 막지 않는다(GraphicRaycaster 없음). 셰이더는 UI 기본과 TMP 기본만 쓴다.
     /// 연출용 난수(UnityEngine.Random)는 게임 난수와 따로다.
     /// </summary>
@@ -40,8 +40,8 @@ namespace DiceHeist.Game
             return fx;
         }
 
-        /// <summary>이 족보면 축하한다.</summary>
-        public static bool Worth(HandRank rank) => rank == HandRank.Straight || rank == HandRank.FiveDice;
+        /// <summary>이 족보면 축하한다(스트레이트 이상: 스트레이트, 포 다이스, 파이브 다이스).</summary>
+        public static bool Worth(HandRank rank) => rank >= HandRank.Straight;
 
         /// <summary>연출을 시작하고 바로 돌아온다(게임 진행을 막지 않는다). 연출 중에 또 부르면 처음부터 다시 한다.</summary>
         public void Play(HandRank rank)
@@ -61,6 +61,7 @@ namespace DiceHeist.Game
         {
             Playing = true;
             bool top = rank == HandRank.FiveDice;
+            bool four = rank == HandRank.FourDice;
             var size = _root.rect.size;
             if (size.x < 1f || size.y < 1f) size = new Vector2(1920, 1080); // 캔버스가 아직 배치 전이면 기준 해상도로
 
@@ -70,26 +71,30 @@ namespace DiceHeist.Game
             flash.rectTransform.anchorMax = Vector2.one;
             flash.rectTransform.offsetMin = flash.rectTransform.offsetMax = Vector2.zero;
 
-            // 2. 제목
+            // 2. 색종이 층: 제목보다 먼저 만들어 뒤에 그린다(글자를 가리지 않게)
+            var paperLayer = NewLayer("ConfettiLayer");
+
+            // 3. 제목
             var titleBg = NewImage("TitleBg", new Color(0.12f, 0.16f, 0.15f, 0.82f));
             titleBg.rectTransform.sizeDelta = new Vector2(size.x + 40, 250);
             titleBg.rectTransform.anchoredPosition = new Vector2(0, 90);
-            var title = NewText("Title", HandEvaluator.NameOf(rank) + "!", top ? 150 : 128, top ? new Color(1f, 0.82f, 0.3f) : Color.white);
+            var title = NewText("Title", HandEvaluator.NameOf(rank) + "!", top ? 150 : four ? 138 : 128,
+                top ? new Color(1f, 0.82f, 0.3f) : four ? new Color(1f, 0.92f, 0.62f) : Color.white);
             title.rectTransform.anchoredPosition = new Vector2(0, 115);
-            var sub = NewText("Sub", top ? "최고 족보! 주사위 다섯 개가 모두 같은 눈" : "축하합니다! 다섯 눈이 이어졌어요", 40, new Color(0.93f, 0.95f, 0.93f));
+            var sub = NewText("Sub", top ? "최고 족보! 주사위 다섯 개가 모두 같은 눈" : four ? "대단해요! 같은 눈이 네 개" : "축하합니다! 다섯 눈이 이어졌어요", 40, new Color(0.93f, 0.95f, 0.93f));
             sub.rectTransform.anchoredPosition = new Vector2(0, 10);
 
-            // 3. 색종이: 왼쪽·오른쪽 아래에서 위로 쏜다. 파이브 다이스는 위에서도 쏟아진다
+            // 4. 색종이: 왼쪽·오른쪽 아래에서 위로 쏜다. 파이브 다이스는 위에서도 쏟아진다
             var bits = new List<Bit>();
-            int perSide = top ? 80 : 55;
+            int perSide = top ? 80 : four ? 68 : 55;
             for (int i = 0; i < perSide; i++)
             {
-                bits.Add(NewBit(new Vector2(-size.x / 2 + 40, -size.y / 2), Random.Range(55f, 80f), Random.Range(1300f, 2100f)));
-                bits.Add(NewBit(new Vector2(size.x / 2 - 40, -size.y / 2), Random.Range(100f, 125f), Random.Range(1300f, 2100f)));
+                bits.Add(NewBit(paperLayer, new Vector2(-size.x / 2 + 40, -size.y / 2), Random.Range(55f, 80f), Random.Range(1300f, 2100f)));
+                bits.Add(NewBit(paperLayer, new Vector2(size.x / 2 - 40, -size.y / 2), Random.Range(100f, 125f), Random.Range(1300f, 2100f)));
             }
             if (top)
                 for (int i = 0; i < 70; i++)
-                    bits.Add(NewBit(new Vector2(Random.Range(-size.x / 2, size.x / 2), size.y / 2 + Random.Range(20f, 400f)), -90f, Random.Range(50f, 250f)));
+                    bits.Add(NewBit(paperLayer, new Vector2(Random.Range(-size.x / 2, size.x / 2), size.y / 2 + Random.Range(20f, 400f)), -90f, Random.Range(50f, 250f)));
 
             const float duration = 3.0f;
             const float gravity = 1900f;
@@ -129,9 +134,9 @@ namespace DiceHeist.Game
             public float Spin, Phase;
         }
 
-        Bit NewBit(Vector2 from, float angleDeg, float speed)
+        Bit NewBit(RectTransform layer, Vector2 from, float angleDeg, float speed)
         {
-            var img = NewImage("Confetti", Paper[Random.Range(0, Paper.Length)]);
+            var img = NewImage("Confetti", Paper[Random.Range(0, Paper.Length)], layer);
             img.rectTransform.sizeDelta = new Vector2(Random.Range(12f, 20f), Random.Range(20f, 32f));
             img.rectTransform.anchoredPosition = from;
             float a = angleDeg * Mathf.Deg2Rad;
@@ -143,10 +148,21 @@ namespace DiceHeist.Game
             };
         }
 
-        Image NewImage(string name, Color color)
+        /// <summary>화면 전체를 덮는 빈 층. 먼저 만든 층이 뒤에 그려진다.</summary>
+        RectTransform NewLayer(string name)
+        {
+            var rt = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
+            rt.SetParent(_root, false);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            return rt;
+        }
+
+        Image NewImage(string name, Color color, RectTransform parent = null)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(_root, false);
+            go.transform.SetParent(parent != null ? parent : _root, false);
             var img = go.GetComponent<Image>();
             img.color = color;
             img.raycastTarget = false;

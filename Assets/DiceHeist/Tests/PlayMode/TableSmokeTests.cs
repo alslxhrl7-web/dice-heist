@@ -74,7 +74,7 @@ namespace DiceHeist.Tests
             var cam = new GameObject("Cam").AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.81f, 0.89f, 0.84f);
-            foreach (var (rank, shot) in new[] { (HandRank.Straight, "celebrate_straight"), (HandRank.FiveDice, "celebrate_five") })
+            foreach (var (rank, shot) in new[] { (HandRank.Straight, "celebrate_straight"), (HandRank.FourDice, "celebrate_four"), (HandRank.FiveDice, "celebrate_five") })
             {
                 var fx = Celebration.Build();
                 yield return null;
@@ -89,8 +89,8 @@ namespace DiceHeist.Tests
                 Assert.AreEqual(0, fx.transform.childCount, "색종이가 남지 않는다");
                 Object.Destroy(fx.gameObject);
             }
-            Assert.IsTrue(Celebration.Worth(HandRank.Straight) && Celebration.Worth(HandRank.FiveDice));
-            Assert.IsFalse(Celebration.Worth(HandRank.FourDice) || Celebration.Worth(HandRank.FullHouse));
+            Assert.IsTrue(Celebration.Worth(HandRank.Straight) && Celebration.Worth(HandRank.FourDice) && Celebration.Worth(HandRank.FiveDice));
+            Assert.IsFalse(Celebration.Worth(HandRank.FullHouse));
         }
 
         [UnityTest, Timeout(600000)]

@@ -393,7 +393,7 @@ namespace DiceHeist.Game
             Refresh();
         }
 
-        /// <summary>내 주사위가 멈췄을 때 스트레이트·파이브 다이스면 축하한다. 이번 판에 축하한 족보보다 높을 때만.</summary>
+        /// <summary>내 주사위가 멈췄을 때 스트레이트 이상(스트레이트·포 다이스·파이브 다이스)이면 축하한다. 이번 판에 축하한 족보보다 높을 때만.</summary>
         void CelebrateIfGreat()
         {
             if (!Has(_v.seats[0].dice)) return;

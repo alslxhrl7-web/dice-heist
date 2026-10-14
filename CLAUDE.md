@@ -35,7 +35,7 @@ Assets/DiceHeist/
 - **Game**: `GameBootstrap`이 실행 시 테이블·동물·UI를 전부 코드로 조립한다. `TableDirector`가 Core를 한 단계씩 진행시키며 연출과 입력 대기를 끼운다
 - 주사위 눈은 Core가 먼저 정한다. `DiceThrower`는 물리를 미리 돌려 녹화하고, 멈춘 윗면에 정해진 눈을 입혀 재생한다. 연출용 난수는 게임 난수를 소비하지 않는다
 - 상대 주사위는 컵 안에 있어 공개 전까지 보이지 않고 리롤 횟수만 표시한다
-- 내 주사위가 멈췄을 때 스트레이트·파이브 다이스면 `Celebration`이 화면 전체 축하(번쩍임·제목·색종이, 약 3초, 클릭은 막지 않음)를 띄운다. 한 판에 같은 족보로는 한 번만. 화면은 PlayMode 테스트가 `Logs/Shots/celebrate_*.png`로 남긴다
+- 내 주사위가 멈췄을 때 스트레이트 이상(스트레이트·포 다이스·파이브 다이스)이면 `Celebration`이 화면 전체 축하(번쩍임·제목·색종이는 제목 뒤, 약 3초, 클릭은 막지 않음)를 띄운다. 한 판에 같은 족보로는 한 번만. 화면은 PlayMode 테스트가 `Logs/Shots/celebrate_*.png`로 남긴다
 - `GameBootstrap.useRandomSeed`를 끄면 `seed` 값으로 같은 판이 재현된다
 
 ## 멀티 서버 (Server/, 2026-10-14 1단계)
