@@ -9,7 +9,7 @@ namespace DiceHeist.Core
         Raise,
     }
 
-    /// <summary>AI 성향. 족보 확률에는 영향을 주지 않고 베팅 빈도만 바꾼다.</summary>
+    /// <summary>AI 성향(캐릭터별). 족보 확률에는 영향을 주지 않고 베팅 빈도만 바꾼다. 테이블 등급별 난이도는 TableConfig.</summary>
     public sealed class AiProfile
     {
         public readonly double Bluff;
@@ -104,6 +104,16 @@ namespace DiceHeist.Core
         }
 
         /// <param name="scary">한 번도 다시 굴리지 않은 상대가 남아 있으면 true. 조심스러워진다.</param>
+        /// <param name="nerve">테이블 등급별 배짱(TableConfig.AiNerve). 1보다 작으면 판에 남으려다가도 겁을 먹고 포기한다.</param>
+        public static BetAction Decide(HandRank rank, AiProfile p, bool raiseUsed, bool responding, bool scary, IRandom rng, double nerve = 1.0)
+        {
+            var act = Decide(rank, p, raiseUsed, responding, scary, rng);
+            if (nerve >= 1.0 || act == BetAction.Fold || rank >= HandRank.Straight) return act;
+            // 스트레이트 밑의 패로는 nerve 확률로만 버틴다
+            double stay = nerve;
+            return rng.NextDouble() < stay ? act : BetAction.Fold;
+        }
+
         public static BetAction Decide(HandRank rank, AiProfile p, bool raiseUsed, bool responding, bool scary, IRandom rng)
         {
             int r = (int)rank;

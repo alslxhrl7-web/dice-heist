@@ -11,8 +11,16 @@ namespace DiceHeist.Core
         public int MaxRerolls = 2;
         public int StartChips = 1000;
         public int RescueChips = 100;
+        /// <summary>AI가 다시 굴릴 수 있는 횟수. 사람보다 적으면 그만큼 AI가 불리하다.</summary>
+        public int AiMaxRerolls = 2;
+        /// <summary>AI의 배짱. 1보다 작으면 스트레이트 밑의 패로는 이 확률로만 판에 남고 나머지는 포기한다.</summary>
+        public double AiNerve = 1.0;
 
-        public static TableConfig Bronze => new TableConfig();
+        /// <summary>
+        /// 입문 테이블. 주사위 확률은 모두 같고 상대 AI만 서툴다(다시 굴리기 1회, 쉽게 포기).
+        /// 사람이 AI와 같은 기준으로 남기고 따라가기만 해도 다섯 판에 네 판쯤(약 80%) 판돈을 딴다.
+        /// </summary>
+        public static TableConfig Bronze => new TableConfig { AiMaxRerolls = 1, AiNerve = 0.07 };
     }
 
     public sealed class ShowdownResult
@@ -100,11 +108,10 @@ namespace DiceHeist.Core
                 Pot += _cfg.Ante;
                 p.ResetForRound();
             }
-            foreach (var p in _players)
-                for (int i = 0; i < p.Dice.Length; i++) p.Dice[i] = _rng.D6();
+            foreach (var p in _players) WeightedDice.Roll(p.Dice, null, _rng);
         }
 
-        public bool CanReroll(PlayerState p) => Betting == null && p.Rerolls < _cfg.MaxRerolls;
+        public bool CanReroll(PlayerState p) => Betting == null && p.Rerolls < (p.IsAi ? _cfg.AiMaxRerolls : _cfg.MaxRerolls);
 
         /// <summary>고정하지 않은 주사위를 다시 굴린다. 다시 굴린 자리 번호를 돌려준다.</summary>
         public int[] Reroll(PlayerState p, IReadOnlyList<bool> held)
@@ -113,7 +120,7 @@ namespace DiceHeist.Core
             var idxs = new List<int>();
             for (int i = 0; i < p.Dice.Length; i++) if (!held[i]) idxs.Add(i);
             if (idxs.Count == 0) throw new InvalidOperationException("모두 고정한 상태에서는 다시 굴릴 수 없습니다.");
-            foreach (int i in idxs) p.Dice[i] = _rng.D6();
+            WeightedDice.Roll(p.Dice, held, _rng);
             p.Rerolls++;
             return idxs.ToArray();
         }
@@ -131,7 +138,7 @@ namespace DiceHeist.Core
             bool scary = false;
             foreach (var q in _players) if (q != p && !q.Folded && q.Rerolls == 0) scary = true;
             var rank = HandEvaluator.Evaluate(p.Dice).Rank;
-            return AiBrain.Decide(rank, p.Ai, Betting.RaiseUsed, Betting.Responding, scary, _rng);
+            return AiBrain.Decide(rank, p.Ai, Betting.RaiseUsed, Betting.Responding, scary, _rng, _cfg.AiNerve);
         }
 
         internal void Pay(PlayerState p, int amount)
