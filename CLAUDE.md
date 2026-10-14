@@ -35,11 +35,12 @@ Assets/DiceHeist/
 - **Game**: `GameBootstrap`이 실행 시 테이블·동물·UI를 전부 코드로 조립한다. `TableDirector`가 Core를 한 단계씩 진행시키며 연출과 입력 대기를 끼운다
 - 주사위 눈은 Core가 먼저 정한다. `DiceThrower`는 물리를 미리 돌려 녹화하고, 멈춘 윗면에 정해진 눈을 입혀 재생한다. 연출용 난수는 게임 난수를 소비하지 않는다
 - 상대 주사위는 컵 안에 있어 공개 전까지 보이지 않고 리롤 횟수만 표시한다
+- 내 주사위가 멈췄을 때 스트레이트·파이브 다이스면 `Celebration`이 화면 전체 축하(번쩍임·제목·색종이, 약 3초, 클릭은 막지 않음)를 띄운다. 한 판에 같은 족보로는 한 번만. 화면은 PlayMode 테스트가 `Logs/Shots/celebrate_*.png`로 남긴다
 - `GameBootstrap.useRandomSeed`를 끄면 `seed` 값으로 같은 판이 재현된다
 
 ## 멀티 서버 (Server/, 2026-10-14 1단계)
 
-C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일).
+C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일). 주사위 눈은 SVG로 그린다(CSS 그리드는 `<button>` 안에서 칸이 0으로 접혀 눈이 안 보였다). 족보 표는 `/api/config`의 hands(RankWeights 확률)로 그린다. 로컬 미리보기 서버는 5090 포트(5080은 서비스가 씀)
 
 - 계정(PBKDF2 비밀번호, 30일 토큰), 칩·사이버머니는 서버 DB(`Server/DiceHeist.Server/dice-heist.db`, git 제외)
 - 방마다 최대 6명(방 수는 제한 없음, 2명부터 시작), 앤티 1,000, 바이인 50,000(머니 → 테이블 stack, 일어나면 돌려받음). 서버가 꺼졌다 켜지면 남은 stack을 돌려준다

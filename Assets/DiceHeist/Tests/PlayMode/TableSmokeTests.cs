@@ -68,6 +68,31 @@ namespace DiceHeist.Tests
             Assert.AreEqual(500, boot.Director.View.seats[0].chips);
         }
 
+        [UnityTest, Timeout(60000)]
+        public IEnumerator 큰_족보_축하_연출은_예외_없이_뜨고_사라진다()
+        {
+            var cam = new GameObject("Cam").AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.81f, 0.89f, 0.84f);
+            foreach (var (rank, shot) in new[] { (HandRank.Straight, "celebrate_straight"), (HandRank.FiveDice, "celebrate_five") })
+            {
+                var fx = Celebration.Build();
+                yield return null;
+                fx.Play(rank);
+                Assert.IsTrue(fx.Playing);
+                yield return new WaitForSeconds(0.5f);
+                yield return Capture(cam, fx.Canvas, shot);
+                float until = Time.realtimeSinceStartup + 6f;
+                while (fx.Playing && Time.realtimeSinceStartup < until) yield return null;
+                yield return null; // Destroy는 프레임 끝에 일어난다
+                Assert.IsFalse(fx.Playing, "3초쯤 뒤 사라진다");
+                Assert.AreEqual(0, fx.transform.childCount, "색종이가 남지 않는다");
+                Object.Destroy(fx.gameObject);
+            }
+            Assert.IsTrue(Celebration.Worth(HandRank.Straight) && Celebration.Worth(HandRank.FiveDice));
+            Assert.IsFalse(Celebration.Worth(HandRank.FourDice) || Celebration.Worth(HandRank.FullHouse));
+        }
+
         [UnityTest, Timeout(600000)]
         public IEnumerator 자동_진행으로_여러_판을_끝까지()
         {

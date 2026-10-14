@@ -34,6 +34,9 @@ namespace DiceHeist.Game
         bool _showHand;
         int _played, _won, _best = -1;
         bool _wired, _entered, _leave;
+        Celebration _celebration;
+        /// <summary>이번 판에 이미 축하한 가장 높은 족보. 같은 족보로 두 번 축하하지 않는다.</summary>
+        HandRank? _celebrated;
 
         /// <summary>서버가 마지막으로 돌려준 상태.</summary>
         SingleView _v;
@@ -49,6 +52,9 @@ namespace DiceHeist.Game
         public int RoundsFinished => _played;
         /// <summary>마지막으로 받은 테이블 상태.</summary>
         public SingleView View => _v;
+        /// <summary>축하 연출을 띄운 횟수(테스트용).</summary>
+        public int Celebrations { get; private set; }
+        public Celebration Celebration => _celebration;
 
         public void Begin(ISingleBackend backend, string tableName, TableScene scene, HudView hud, long seed, bool autoPlay)
         {
@@ -61,6 +67,7 @@ namespace DiceHeist.Game
             if (!_wired)
             {
                 _wired = true;
+                _celebration = Celebration.Build();
                 _hud.ButtonClicked += id => _choice = id;
                 foreach (var die in _scene.Seats[0].Dice) die.Clicked += OnDieClicked;
             }
@@ -170,6 +177,8 @@ namespace DiceHeist.Game
                 _scene.ShakeCup(1),
                 _scene.ShakeCup(2));
             _showHand = true;
+            _celebrated = null;
+            CelebrateIfGreat();
 
             // 2. 남기기
             Phase = "hold";
@@ -194,6 +203,7 @@ namespace DiceHeist.Game
                 SyncShown();
                 if (ev != null) yield return _scene.ThrowMine(ev.idxs, _v.seats[0].dice);
                 _showHand = true;
+                CelebrateIfGreat();
             }
             SetPickable(false);
             Array.Clear(_held, 0, _held.Length);
@@ -381,6 +391,20 @@ namespace DiceHeist.Game
             }
             SyncShown();
             Refresh();
+        }
+
+        /// <summary>내 주사위가 멈췄을 때 스트레이트·파이브 다이스면 축하한다. 이번 판에 축하한 족보보다 높을 때만.</summary>
+        void CelebrateIfGreat()
+        {
+            if (!Has(_v.seats[0].dice)) return;
+            var rank = HandEvaluator.Evaluate(_v.seats[0].dice).Rank;
+            if (!Celebration.Worth(rank) || (_celebrated.HasValue && rank <= _celebrated.Value)) return;
+            _celebrated = rank;
+            Celebrations++;
+            Log($"나 · {HandEvaluator.NameOf(rank)}!");
+            Refresh();
+            _celebration.Play(rank);
+            StartCoroutine(_scene.Seats[0].Animal.Cheer());
         }
 
         (SeatView[] seats, int pot) Snapshot() => (Copy(_v.seats), _v.pot);

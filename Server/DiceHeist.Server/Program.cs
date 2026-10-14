@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using DiceHeist.Core;
 using DiceHeist.Server;
 using DiceHeist.Server.Data;
 using DiceHeist.Server.Multi;
@@ -123,7 +124,12 @@ app.MapPost("/api/exchange", (HttpRequest req, ExchangeRequest e) =>
 
 // 시험용: 머니를 더 받는다. 개발 모드에서는 항상 켜지고, 운영(서비스)에서는 Dev:AllowGrant가 true일 때만 켜진다. 공개 전에 끈다
 bool allowGrant = app.Environment.IsDevelopment() || app.Configuration.GetValue("Dev:AllowGrant", false);
-app.MapGet("/api/config", () => new { devGrant = allowGrant });
+// 족보 표(높은 순): 이름과 한 번 굴렸을 때 나올 확률. 확률은 Core의 WeightedDice.RankWeights 그대로라 싱글·멀티가 같다
+double weightSum = WeightedDice.RankWeights.Sum();
+var hands = Enumerable.Range(0, WeightedDice.RankWeights.Length).Reverse()
+    .Select(r => new { rank = r, name = HandEvaluator.NameOf((HandRank)r), chance = WeightedDice.RankWeights[r] / weightSum })
+    .ToArray();
+app.MapGet("/api/config", () => new { devGrant = allowGrant, hands });
 if (allowGrant)
 {
     app.MapPost("/api/dev/grant", (HttpRequest req) =>

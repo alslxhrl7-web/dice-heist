@@ -352,6 +352,7 @@ namespace DiceHeist.Server.Multi
                         turn = p != null && p == current,
                         dice = show ? p.Dice.ToArray() : null,
                         hand = show ? HandEvaluator.NameOf(HandEvaluator.Evaluate(p.Dice).Rank) : null,
+                        rank = show ? (int?)HandEvaluator.Evaluate(p.Dice).Rank : null,
                     };
                 }).ToArray(),
                 me = mine == null ? null : new

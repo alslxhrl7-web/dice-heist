@@ -127,11 +127,24 @@ $('me').addEventListener('click', e => {
 
 // ---------- 그리기 ----------
 
+// 눈은 SVG로 그린다. 예전 CSS 그리드 방식은 <button> 안에서 칸 크기가 0으로 접혀 눈이 안 보였다(크롬·사파리)
 function dieFace(v) {
-  const on = PIPS[v] || [];
-  let s = '';
-  for (let i = 0; i < 9; i++) s += `<span class="pip${on.includes(i) ? ' on' : ''}"></span>`;
-  return s;
+  const dots = (PIPS[v] || []).map(i => `<circle cx="${20 + (i % 3) * 30}" cy="${20 + Math.floor(i / 3) * 30}" r="10.5"/>`).join('');
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">${dots}</svg>`;
+}
+
+// 족보 표: 높은 순으로, 예시 주사위와 한 번 굴렸을 때 나올 확률. 지금 내 족보 줄을 칠한다
+const EXAMPLES = { 7:[6,6,6,6,6], 6:[5,5,5,5,2], 5:[2,3,4,5,6], 4:[4,4,4,2,2], 3:[3,3,3,6,1], 2:[5,5,2,2,6], 1:[4,4,1,3,6], 0:[1,2,3,5,6] };
+let hands = [];
+function renderHands(myRank) {
+  const el = $('hands');
+  if (!el || !hands.length) return;
+  el.innerHTML = hands.map(h => `
+    <li class="${h.rank === myRank ? 'mine' : ''}">
+      <span class="rank-name">${esc(h.name)}${h.rank === myRank ? ' <span class="pill first">지금 내 족보</span>' : ''}</span>
+      <span class="mini">${(EXAMPLES[h.rank] || []).map(v => `<span class="die xs">${dieFace(v)}</span>`).join('')}</span>
+      <span class="num chance">${(h.chance * 100).toFixed(h.chance < 0.01 ? 1 : 0)}%</span>
+    </li>`).join('');
 }
 
 function statusPill(s) {
@@ -240,6 +253,7 @@ function renderGame() {
     ${hint ? `<p class="hint">${esc(hint)}</p>` : ''}`;
 
   $('log').innerHTML = s.log.map(l => `<li>${esc(l)}</li>`).join('');
+  renderHands(mine?.rank ?? -1);
 }
 
 // 남은 시간 막대
@@ -254,7 +268,12 @@ setInterval(() => {
 // ---------- 시작 ----------
 
 (async () => {
-  try { devGrant = (await (await fetch('/api/config')).json()).devGrant; } catch {}
+  try {
+    const cfg = await (await fetch('/api/config')).json();
+    devGrant = cfg.devGrant;
+    hands = cfg.hands || [];
+  } catch {}
+  renderHands(-1);
   if (token) {
     try { profile = await api('/api/me'); await connect(); }
     catch { token = null; }

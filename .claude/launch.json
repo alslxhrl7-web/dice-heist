@@ -4,8 +4,8 @@
     {
       "name": "multi-server",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Server/DiceHeist.Server", "--launch-profile", "http"],
-      "port": 5080
+      "runtimeArgs": ["run", "--project", "Server/DiceHeist.Server", "--launch-profile", "http", "--urls", "http://localhost:5090"],
+      "port": 5090
     }
   ]
 }
