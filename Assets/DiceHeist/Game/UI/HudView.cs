@@ -56,7 +56,7 @@ namespace DiceHeist.Game
         TMP_FontAsset _font;
         Camera _cam;
         RectTransform _canvasRect;
-        TextMeshProUGUI _stats, _hand, _handSub, _hint, _log, _bannerText, _potText;
+        TextMeshProUGUI _sub, _stats, _hand, _handSub, _hint, _log, _bannerText, _potText;
         Image _bannerBg;
         RectTransform _buttonRow;
         readonly List<(Transform anchor, RectTransform rect)> _followers = new List<(Transform, RectTransform)>();
@@ -96,8 +96,8 @@ namespace DiceHeist.Game
             var top = Panel(root, new Vector2(0, 0), new Vector2(0, 0), new Vector2(24, 20), new Vector2(430, 190));
             var title = Label(top, "다이스 하이스트", 38, TextAlignmentOptions.TopLeft, Ink);
             Stretch(title.rectTransform, 18, 12, 18, 12);
-            var sub = Label(top, "프로토타입 · 브론즈 테이블 · 앤티 (참가비) 10칩", 20, TextAlignmentOptions.TopLeft, Muted);
-            Stretch(sub.rectTransform, 18, 62, 18, 12);
+            _sub = Label(top, "", 20, TextAlignmentOptions.TopLeft, Muted);
+            Stretch(_sub.rectTransform, 18, 62, 18, 12);
             _stats = Label(top, "", 24, TextAlignmentOptions.BottomLeft, Ink);
             Stretch(_stats.rectTransform, 18, 12, 18, 14);
 
@@ -190,6 +190,7 @@ namespace DiceHeist.Game
             _stats.text = $"내 칩 <b>{chips:N0}</b>   판 <b>{round}</b>   승률 <b>{winRatePercent}%</b>\n최고 족보 <b>{bestHand}</b>   <color=#7a8a84>시드 {seed}</color>";
         }
 
+        public void SetTable(string text) => _sub.text = text;
         public void SetHand(string name) => _hand.text = name;
         public void SetHint(string hint) => _hint.text = hint;
         public void SetPot(int pot) => _potText.text = $"팟 (판돈) <b>{pot}</b>";

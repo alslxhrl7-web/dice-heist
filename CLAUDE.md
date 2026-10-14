@@ -40,6 +40,8 @@ Assets/DiceHeist/
 - 판정 로직은 Core에만 둔다. Core 어셈블리는 `noEngineReferences`라 UnityEngine을 쓰면 컴파일되지 않는다
 - 족보 개수 검증(7,776가지: 노페어 480, 원페어 3600, 투페어 1800, 트리플 1200, 풀하우스 300, 스트레이트 240, 포 다이스 150, 파이브 다이스 6)을 깨지 않는다. 이것은 판정(HandEvaluator) 검증이고, 실제 굴림 확률은 따로다
 - 주사위는 공정하지 않다. 굴릴 때마다 결과 족보를 `WeightedDice.RankWeights` 확률표(노페어 36% > 원페어 28% > … > 파이브 0.4%, 낮은 족보일수록 흔함)로 먼저 뽑는다. 화면의 족보 표도 이 값을 읽는다
+- 테이블 등급(`TableConfig.Tiers`): 브론즈 500칩 시작·한도 1,000·앤티 10 / 실버 700칩 이상 입장·한도 1,500·앤티 20 / 골드 1,000칩 이상 입장·한도 2,000·앤티 30. 한도를 넘게 딴 칩은 받지 못한다(`ShowdownResult.OverCap`). 실버·골드 앤티와 AI 강도는 사용자가 정하지 않아 임시로 정한 값이다. 내 칩은 바뀔 때마다 PlayerPrefs `DiceHeist.Chips`(Windows는 레지스트리)에 저장된다. 시작 화면의 기록 지우기(두 번 누름)로 500칩부터 다시. 테스트는 `GameBootstrap.UseSave = false` 또는 AutoPlay로 저장을 건드리지 않는다
+- 환전(ChipExchange): 싱글에서 번 칩을 멀티용 사이버머니로 한 방향만 바꾼다. 칩 1 = 100머니, 100칩 단위, 처음 500칩 위로 번 칩만(구제 칩이 새지 않게). 사이버머니는 PlayerPrefs DiceHeist.CyberMoney(문자열). 현금 환전·현금 구매는 넣지 않는다(사용자 결정, 법적 제약 회피)
 - 브론즈는 상대 AI만 서툴다(다시 굴리기 1회, 스트레이트 밑의 패로는 7%만 버팀). 사람 승률 약 80%를 `브론즈에서는_사람이_다섯_판에_네_판쯤_딴다` 테스트가 지킨다
 - 입력은 Input System 패키지만 쓴다(`activeInputHandler: 1`). `UnityEngine.Input`이나 `StandaloneInputModule`을 쓰면 실행 중 예외가 난다. UI 클릭은 `HudView`가 만드는 `InputSystemUIInputModule`이 처리한다
 - 머티리얼은 `Fx.Mat`으로 만든다. 코드에서 셰이더만으로 새 머티리얼을 만들면 빌드에서 셰이더가 빠져 분홍색으로 나온다

@@ -5,11 +5,19 @@ namespace DiceHeist.Core
 {
     public sealed class TableConfig
     {
+        public string Name = "연습";
+        /// <summary>입장하려면 가지고 있어야 하는 칩.</summary>
+        public int MinChips;
+        /// <summary>이 테이블에서 가질 수 있는 최대 칩. 넘게 따면 넘친 만큼은 받지 못한다.</summary>
+        public int ChipCap = int.MaxValue;
         public int Ante = 10;
         /// <summary>올리기 금액 = 참가비 × 이 값.</summary>
         public int RaiseMultiplier = 3;
         public int MaxRerolls = 2;
+        /// <summary>처음 시작하는 사람의 칩.</summary>
         public int StartChips = 1000;
+        /// <summary>AI의 지갑. 모자라면 이만큼 새로 채워 온다.</summary>
+        public int AiStartChips = 1000;
         public int RescueChips = 100;
         /// <summary>AI가 다시 굴릴 수 있는 횟수. 사람보다 적으면 그만큼 AI가 불리하다.</summary>
         public int AiMaxRerolls = 2;
@@ -17,10 +25,34 @@ namespace DiceHeist.Core
         public double AiNerve = 1.0;
 
         /// <summary>
-        /// 입문 테이블. 주사위 확률은 모두 같고 상대 AI만 서툴다(다시 굴리기 1회, 쉽게 포기).
+        /// 입문 테이블. 500칩으로 시작해 1,000칩까지 벌 수 있다. 주사위 확률은 모두 같고 상대 AI만 서툴다(다시 굴리기 1회, 쉽게 포기).
         /// 사람이 AI와 같은 기준으로 남기고 따라가기만 해도 다섯 판에 네 판쯤(약 80%) 판돈을 딴다.
         /// </summary>
-        public static TableConfig Bronze => new TableConfig { AiMaxRerolls = 1, AiNerve = 0.07 };
+        public static TableConfig Bronze => new TableConfig
+        {
+            Name = "브론즈", MinChips = 0, ChipCap = 1000, Ante = 10, StartChips = 500,
+            AiMaxRerolls = 1, AiNerve = 0.07,
+        };
+
+        /// <summary>700칩 이상 가지고 있어야 입장, 1,500칩까지. AI는 다시 굴리기 2회에 배짱은 절반.</summary>
+        public static TableConfig Silver => new TableConfig
+        {
+            Name = "실버", MinChips = 700, ChipCap = 1500, Ante = 20, AiStartChips = 1500,
+            AiMaxRerolls = 2, AiNerve = 0.5,
+        };
+
+        /// <summary>1,000칩 이상 가지고 있어야 입장, 2,000칩까지. AI는 제 실력(웹 프로토타입과 같은 판단).</summary>
+        public static TableConfig Gold => new TableConfig
+        {
+            Name = "골드", MinChips = 1000, ChipCap = 2000, Ante = 30, AiStartChips = 2000,
+            AiMaxRerolls = 2, AiNerve = 1.0,
+        };
+
+        /// <summary>낮은 등급부터.</summary>
+        public static TableConfig[] Tiers => new[] { Bronze, Silver, Gold };
+
+        /// <summary>chips를 가지고 이 테이블에 앉을 수 있는지. 브론즈는 칩이 바닥나도 앉아서 구제 칩을 받는다.</summary>
+        public bool CanEnter(int chips) => chips >= MinChips;
     }
 
     public sealed class ShowdownResult
@@ -32,6 +64,8 @@ namespace DiceHeist.Core
         public int Share;
         /// <summary>나누고 남은 칩. 첫 번째 승자가 가져간다.</summary>
         public int Remainder;
+        /// <summary>테이블 한도(ChipCap)를 넘어 사람이 받지 못한 칩.</summary>
+        public int OverCap;
         public HandValue BestHand;
         /// <summary>공개된 사람들의 족보(강한 순).</summary>
         public List<(PlayerState player, HandValue hand)> Hands = new List<(PlayerState, HandValue)>();
@@ -54,6 +88,7 @@ namespace DiceHeist.Core
         public int RaiseTotal => _cfg.Ante * _cfg.RaiseMultiplier;
         public int MaxRerolls => _cfg.MaxRerolls;
         public int RescueChips => _cfg.RescueChips;
+        public TableConfig Config => _cfg;
 
         public int RoundNo { get; private set; }
         /// <summary>이번 판의 선. 판마다 한 자리씩 돌아간다.</summary>
@@ -61,13 +96,16 @@ namespace DiceHeist.Core
         public int Pot { get; private set; }
         public BettingRound Betting { get; private set; }
 
-        public DiceGame(TableConfig cfg, IRandom rng)
+        int _humanChipsAtStart;
+
+        /// <param name="humanChips">사람이 가지고 앉는 칩. 음수면 cfg.StartChips(처음 시작).</param>
+        public DiceGame(TableConfig cfg, IRandom rng, int humanChips = -1)
         {
             _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
             _rng = rng ?? throw new ArgumentNullException(nameof(rng));
-            _players.Add(new PlayerState(0, "me", "나", cfg.StartChips, null));
-            _players.Add(new PlayerState(1, "rac", "너구리", cfg.StartChips, AiProfile.Raccoon));
-            _players.Add(new PlayerState(2, "cat", "고양이", cfg.StartChips, AiProfile.Cat));
+            _players.Add(new PlayerState(0, "me", "나", humanChips >= 0 ? humanChips : cfg.StartChips, null));
+            _players.Add(new PlayerState(1, "rac", "너구리", cfg.AiStartChips, AiProfile.Raccoon));
+            _players.Add(new PlayerState(2, "cat", "고양이", cfg.AiStartChips, AiProfile.Cat));
         }
 
         public bool HumanIsBroke => Human.Chips < _cfg.Ante;
@@ -88,7 +126,7 @@ namespace DiceHeist.Core
             foreach (var p in _players)
             {
                 if (!p.IsAi || p.Chips >= _cfg.Ante * 4) continue;
-                p.Chips = _cfg.StartChips;
+                p.Chips = _cfg.AiStartChips;
                 refilled.Add(p);
             }
             return refilled;
@@ -98,6 +136,7 @@ namespace DiceHeist.Core
         public void StartRound()
         {
             if (HumanIsBroke) throw new InvalidOperationException("참가비가 모자랍니다. Rescue를 먼저 호출하세요.");
+            _humanChipsAtStart = Human.Chips;
             RoundNo++;
             Starter = (RoundNo - 1) % _players.Count;
             Pot = 0;
@@ -185,6 +224,14 @@ namespace DiceHeist.Core
             {
                 res.Winners[i].Chips += res.Share + (i == 0 ? res.Remainder : 0);
                 res.Winners[i].Winner = true;
+            }
+
+            // 테이블 한도: 넘게 딴 만큼은 받지 못한다. 한도 위에서 앉았더라도 한도 때문에 칩이 줄지는 않는다
+            int limit = Math.Max(_cfg.ChipCap, _humanChipsAtStart);
+            if (Human.Chips > limit)
+            {
+                res.OverCap = Human.Chips - limit;
+                Human.Chips = limit;
             }
             Pot = 0;
             return res;

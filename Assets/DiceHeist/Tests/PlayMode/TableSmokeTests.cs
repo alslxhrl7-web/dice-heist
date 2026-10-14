@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using DiceHeist.Core;
 using DiceHeist.Game;
 using NUnit.Framework;
 using UnityEngine;
@@ -20,13 +21,15 @@ namespace DiceHeist.Tests
         {
             Time.timeScale = 1f;
             GameBootstrap.AutoPlay = false;
+            GameBootstrap.UseSave = true;
             // 다음 테스트에 테이블·UI가 겹쳐 남지 않게 치운다
             foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects()) Object.Destroy(go);
         }
 
         [UnityTest, Timeout(120000)]
-        public IEnumerator 시작_화면에서_시작을_누르면_게임이_시작된다()
+        public IEnumerator 시작_화면에서_브론즈를_고르면_게임이_시작된다()
         {
+            GameBootstrap.UseSave = false; // 사람의 저장을 읽거나 덮어쓰지 않는다
             var boot = new GameObject("GameBootstrap").AddComponent<GameBootstrap>();
             boot.useRandomSeed = false;
             yield return null;
@@ -37,13 +40,21 @@ namespace DiceHeist.Tests
             Assert.IsFalse(boot.Hud.Canvas.enabled);
             yield return Capture(boot.Cam, boot.StartScreen.Canvas, "start");
 
-            boot.StartScreen.transform.Find("Card/Btn_start").GetComponent<Button>().onClick.Invoke();
+            // 처음 500칩으로는 브론즈만 열려 있다
+            var card = boot.StartScreen.transform.Find("Card");
+            Assert.IsTrue(card.Find("Btn_table0").GetComponent<Button>().interactable, "브론즈");
+            Assert.IsFalse(card.Find("Btn_table1").GetComponent<Button>().interactable, "실버");
+            Assert.IsFalse(card.Find("Btn_table2").GetComponent<Button>().interactable, "골드");
+
+            card.Find("Btn_table0").GetComponent<Button>().onClick.Invoke();
             yield return null;
             yield return null;
 
             Assert.IsTrue(boot.StartScreen == null);
             Assert.IsTrue(boot.Hud.Canvas.enabled);
             Assert.AreNotEqual("idle", boot.Director.Phase);
+            Assert.AreEqual("브론즈", boot.Director.Game.Config.Name);
+            Assert.AreEqual(500, boot.Director.Game.Human.Chips);
         }
 
         [UnityTest, Timeout(600000)]
@@ -80,7 +91,8 @@ namespace DiceHeist.Tests
                 Assert.GreaterOrEqual(p.Chips, 0);
                 total += p.Chips;
             }
-            Assert.AreEqual(3000, total, "지갑 채우기가 없었다면 칩 총량은 그대로여야 한다");
+            var cfg = TableConfig.Bronze;
+            Assert.AreEqual(cfg.StartChips + 2 * cfg.AiStartChips, total, "지갑 채우기와 한도가 없었다면 칩 총량은 그대로여야 한다");
         }
 
         static IEnumerator Capture(Camera cam, Canvas canvas, string name)

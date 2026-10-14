@@ -21,7 +21,8 @@ namespace DiceHeist.Tests
             for (int i = 0; i < 5; i++) p.Dice[i] = s[i] - '0';
         }
 
-        static DiceGame NewGame(TableConfig cfg = null) => new DiceGame(cfg ?? TableConfig.Bronze, new FixedRandom());
+        // 규칙 검사는 한도·약한 AI가 없는 기본 테이블(모두 1,000칩)에서 한다
+        static DiceGame NewGame(TableConfig cfg = null) => new DiceGame(cfg ?? new TableConfig(), new FixedRandom());
 
         static DiceGame GameAtBetting(string me, string rac, string cat, TableConfig cfg = null)
         {
@@ -240,9 +241,10 @@ namespace DiceHeist.Tests
                 if (g.HumanIsBroke) break;
                 g.RefillAi(); // 지갑 채우기는 칩이 늘어나는 유일한 경로라 비교 전에 먼저 처리
                 int before = g.Players[0].Chips + g.Players[1].Chips + g.Players[2].Chips;
-                PlayAutoRound(g);
+                var res = PlayAutoRound(g);
                 int after = g.Players[0].Chips + g.Players[1].Chips + g.Players[2].Chips;
-                Assert.AreEqual(before, after);
+                // 한도를 넘어 못 받은 칩만큼만 줄어든다
+                Assert.AreEqual(before, after + res.OverCap);
             }
         }
 
@@ -290,7 +292,7 @@ namespace DiceHeist.Tests
         }
 
         /// <summary>사람 자리도 AI 홀드 규칙으로 굴리고 항상 따라가는 자동 진행.</summary>
-        static void PlayAutoRound(DiceGame g)
+        static ShowdownResult PlayAutoRound(DiceGame g)
         {
             g.RefillAi();
             g.StartRound();
@@ -309,7 +311,7 @@ namespace DiceHeist.Tests
                 var p = bet.Current;
                 bet.Apply(p.IsAi ? g.DecideAi(p) : BetAction.Call);
             }
-            g.ResolveShowdown();
+            return g.ResolveShowdown();
         }
 
         [Test]

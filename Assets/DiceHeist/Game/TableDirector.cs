@@ -32,6 +32,14 @@ namespace DiceHeist.Game
         PlayerState _turn;
         bool _showHand;
         int _played, _won, _best = -1;
+        bool _wired, _entered, _leave;
+
+        int _lastChips = -1;
+
+        /// <summary>결과 화면에서 테이블 선택을 눌러 자리에서 일어났을 때.</summary>
+        public event Action Left;
+        /// <summary>내 칩이 바뀔 때마다(앤티, 베팅, 쇼다운, 구제 칩). 저장에 쓴다.</summary>
+        public event Action<int> ChipsChanged;
 
         /// <summary>지금 단계: entrance / rolling / hold / ai / betting / bet / respond / result / broke</summary>
         public string Phase { get; private set; } = "idle";
@@ -45,25 +53,40 @@ namespace DiceHeist.Game
             _hud = hud;
             _seed = seed;
             _auto = autoPlay;
-            _hud.ButtonClicked += id => _choice = id;
-            foreach (var die in _scene.Seats[0].Dice) die.Clicked += OnDieClicked;
+            if (!_wired)
+            {
+                _wired = true;
+                _hud.ButtonClicked += id => _choice = id;
+                foreach (var die in _scene.Seats[0].Dice) die.Clicked += OnDieClicked;
+            }
+            var cfg = game.Config;
+            _hud.SetTable($"{cfg.Name} 테이블 · {Ante} {cfg.Ante}칩 · 한도 {cfg.ChipCap:N0}칩");
+            Log($"{cfg.Name} 테이블에 앉았다 · {game.Human.Chips:N0}칩");
             StartCoroutine(Main());
         }
 
         IEnumerator Main()
         {
-            Phase = "entrance";
-            _hud.SetHint("동물들이 테이블로 나오는 중…");
-            Refresh();
-            yield return _scene.Entrance();
-            while (true) yield return PlayRound();
+            if (!_entered)
+            {
+                Phase = "entrance";
+                _hud.SetHint("동물들이 테이블로 나오는 중…");
+                Refresh();
+                yield return _scene.Entrance();
+                _entered = true;
+            }
+            _leave = false;
+            while (!_leave) yield return PlayRound();
+            Phase = "idle";
+            _hud.HideBanner();
+            Left?.Invoke();
         }
 
         IEnumerator PlayRound()
         {
             var me = _game.Human;
             _hud.HideBanner();
-            foreach (var p in _game.RefillAi()) Log($"{p.Name} · 지갑을 새로 채워 왔다 (1,000칩)");
+            foreach (var p in _game.RefillAi()) Log($"{p.Name} · 지갑을 새로 채워 왔다 ({p.Chips:N0}칩)");
 
             if (_game.HumanIsBroke)
             {
@@ -236,9 +259,18 @@ namespace DiceHeist.Game
                 else animal.SetDroop(true);
             }
 
+            var cfg = _game.Config;
+            if (res.OverCap > 0) Log($"{cfg.Name} 한도 {cfg.ChipCap:N0}칩 · 넘친 {res.OverCap}칩은 못 받음");
+            var up = TableConfig.Tiers.FirstOrDefault(t => t.MinChips > cfg.MinChips && t.CanEnter(me.Chips));
+            if (me.Chips >= cfg.ChipCap)
+                _hud.SetHint(up != null ? $"{cfg.Name} 한도에 닿았습니다. 테이블 선택에서 {up.Name}로 올라가세요." : $"{cfg.Name} 한도에 닿았습니다.");
+            else if (up != null)
+                _hud.SetHint($"{up.Name} 테이블에 앉을 수 있습니다 ({up.MinChips:N0}칩 이상). 테이블 선택에서 옮길 수 있어요.");
+
             Phase = "result";
             Refresh();
-            yield return Choose(new ButtonSpec("next", "다음 판", ButtonStyle.Primary));
+            yield return Choose(new ButtonSpec("next", "다음 판", ButtonStyle.Primary), new ButtonSpec("tables", "테이블 선택"));
+            if (_choice == "tables") _leave = true;
         }
 
         // ---------- 입력 ----------
@@ -313,6 +345,11 @@ namespace DiceHeist.Game
         void Refresh()
         {
             var me = _game.Human;
+            if (me.Chips != _lastChips)
+            {
+                _lastChips = me.Chips;
+                ChipsChanged?.Invoke(me.Chips);
+            }
             int rate = _played > 0 ? Mathf.RoundToInt(_won * 100f / _played) : 0;
             _hud.SetStats(me.Chips, _game.RoundNo, rate, _best >= 0 ? HandEvaluator.NameOf((HandRank)_best) : "-", _seed);
             _hud.SetHand(_showHand ? HandEvaluator.NameOf(HandEvaluator.Evaluate(me.Dice).Rank) : "…");
