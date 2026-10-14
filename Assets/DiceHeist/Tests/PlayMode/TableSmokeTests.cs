@@ -16,20 +16,24 @@ namespace DiceHeist.Tests
     {
         const int Rounds = 4;
 
-        [TearDown]
-        public void TearDown()
+        [UnityTearDown]
+        public IEnumerator TearDown()
         {
             Time.timeScale = 1f;
             GameBootstrap.AutoPlay = false;
             GameBootstrap.UseSave = true;
-            // 다음 테스트에 테이블·UI가 겹쳐 남지 않게 치운다
+            GameBootstrap.UseServer = true;
+            // 다음 테스트에 테이블·UI·카메라가 겹쳐 남지 않게 치운다.
+            // Destroy는 프레임 끝에 일어나므로 한 프레임 기다려야, 다음 테스트가 사라질 카메라를 집어 쓰지 않는다
             foreach (var go in SceneManager.GetActiveScene().GetRootGameObjects()) Object.Destroy(go);
+            yield return null;
         }
 
         [UnityTest, Timeout(120000)]
         public IEnumerator 시작_화면에서_브론즈를_고르면_게임이_시작된다()
         {
             GameBootstrap.UseSave = false; // 사람의 저장을 읽거나 덮어쓰지 않는다
+            GameBootstrap.UseServer = false; // 로그인 없이 오프라인으로
             var boot = new GameObject("GameBootstrap").AddComponent<GameBootstrap>();
             boot.useRandomSeed = false;
             yield return null;
@@ -53,8 +57,8 @@ namespace DiceHeist.Tests
             Assert.IsTrue(boot.StartScreen == null);
             Assert.IsTrue(boot.Hud.Canvas.enabled);
             Assert.AreNotEqual("idle", boot.Director.Phase);
-            Assert.AreEqual("브론즈", boot.Director.Game.Config.Name);
-            Assert.AreEqual(500, boot.Director.Game.Human.Chips);
+            Assert.AreEqual("브론즈", boot.Director.View.table);
+            Assert.AreEqual(500, boot.Director.View.seats[0].chips);
         }
 
         [UnityTest, Timeout(600000)]
@@ -75,7 +79,7 @@ namespace DiceHeist.Tests
             {
                 Assert.Less(Time.realtimeSinceStartup, deadline, $"시간 초과: {boot.Director.Phase}, {boot.Director.RoundsFinished}판");
                 string phase = boot.Director.Phase;
-                string key = phase == "result" || phase == "hold" ? $"{phase}_{boot.Director.Game.RoundNo}" : phase;
+                string key = phase == "result" || phase == "hold" ? $"{phase}_{boot.Director.View.roundNo}" : phase;
                 if (shot.Add(key))
                 {
                     // 연출이 조금 진행된 뒤의 화면을 남긴다
@@ -86,10 +90,10 @@ namespace DiceHeist.Tests
             }
 
             int total = 0;
-            foreach (var p in boot.Director.Game.Players)
+            foreach (var p in boot.Director.View.seats)
             {
-                Assert.GreaterOrEqual(p.Chips, 0);
-                total += p.Chips;
+                Assert.GreaterOrEqual(p.chips, 0);
+                total += p.chips;
             }
             var cfg = TableConfig.Bronze;
             Assert.AreEqual(cfg.StartChips + 2 * cfg.AiStartChips, total, "지갑 채우기와 한도가 없었다면 칩 총량은 그대로여야 한다");
