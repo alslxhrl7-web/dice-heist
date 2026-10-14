@@ -22,6 +22,8 @@ namespace DiceHeist.Server.Tests
             _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
             {
                 b.UseSetting("Db:Path", _dbPath);
+                // 테스트마다 따로 둔다. 같은 폴더면 같은 초에 만든 사본 이름이 겹쳐 백업 실패가 이벤트 로그에 쌓인다
+                b.UseSetting("Db:BackupDir", _dbPath + "-backups");
                 b.UseSetting("Multi:CountdownSeconds", "0.2");
                 b.UseSetting("Multi:HoldSeconds", "30");
                 b.UseSetting("Multi:BetSeconds", "30");
@@ -36,6 +38,7 @@ namespace DiceHeist.Server.Tests
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             foreach (var f in new[] { _dbPath, _dbPath + "-wal", _dbPath + "-shm" })
                 try { File.Delete(f); } catch { }
+            try { Directory.Delete(_dbPath + "-backups", true); } catch { }
         }
 
         sealed class Player
@@ -53,9 +56,7 @@ namespace DiceHeist.Server.Tests
             var res = await http.PostAsJsonAsync("/api/register", new { name, password = "secret123" });
             Assert.IsTrue(res.IsSuccessStatusCode, await res.Content.ReadAsStringAsync());
             var token = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
-            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            Assert.IsTrue((await http.PostAsync("/api/dev/grant", null)).IsSuccessStatusCode);
-
+            // 테스트 머니 없이 가입 때 받는 시작 머니만으로 앉는다
             var p = new Player { Token = token };
             var server = _factory.Server;
             p.Hub = new HubConnectionBuilder()
@@ -144,23 +145,43 @@ namespace DiceHeist.Server.Tests
         }
 
         [Test]
-        public async Task 브론즈를_안_지났으면_멀티에_앉을_수_없다()
+        public async Task 가입하면_시작_머니를_받고_싱글_없이_바로_멀티에_앉는다()
         {
+            var p = await SignUp("새내기");
             var http = _factory.CreateClient();
-            var res = await http.PostAsJsonAsync("/api/register", new { name = "새내기", password = "secret123" });
-            var token = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
-            var server = _factory.Server;
-            var hub = new HubConnectionBuilder()
-                .WithUrl(new Uri(server.BaseAddress, "hub"), o =>
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", p.Token);
+            var me = await http.GetFromJsonAsync<JsonElement>("/api/me");
+            Assert.AreEqual(Data.Db.StarterMoney, me.GetProperty("money").GetInt64());
+            Assert.IsFalse(me.GetProperty("bronzeCleared").GetBoolean());
+            Assert.IsNull(await p.Hub.InvokeAsync<string>("CreateRoom", "방"));
+        }
+
+        [Test]
+        public void 시작_머니가_생기기_전에_가입한_계정도_한_번만_받는다()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"dh-starter-{Guid.NewGuid():N}.db");
+            try
+            {
+                var db = new Data.Db(path);
+                long id = db.CreateUser("예전사람", "secret123").Value;
+                // 예전 계정처럼 시작 머니 기록을 지운다
+                using (var c = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + path))
                 {
-                    o.AccessTokenProvider = () => Task.FromResult(token);
-                    o.HttpMessageHandlerFactory = _ => server.CreateHandler();
-                    o.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
-                })
-                .Build();
-            await hub.StartAsync();
-            var err = await hub.InvokeAsync<string>("CreateRoom", "방");
-            StringAssert.Contains("브론즈", err);
+                    c.Open();
+                    using var cmd = c.CreateCommand();
+                    cmd.CommandText = "UPDATE users SET money = 0; DELETE FROM ledger WHERE kind = 'starter';";
+                    cmd.ExecuteNonQuery();
+                }
+                new Data.Db(path);
+                new Data.Db(path); // 다시 켜도 또 주지 않는다
+                Assert.AreEqual(Data.Db.StarterMoney, new Data.Db(path).GetUser(id).Money);
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                foreach (var f in new[] { path, path + "-wal", path + "-shm" })
+                    try { File.Delete(f); } catch { }
+            }
         }
 
         [TestCase("토끼", true)]

@@ -20,7 +20,11 @@ namespace DiceHeist.Server.Tests
         public async Task SetUp()
         {
             _dbPath = Path.Combine(Path.GetTempPath(), $"dh-single-{Guid.NewGuid():N}.db");
-            _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("Db:Path", _dbPath));
+            _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            {
+                b.UseSetting("Db:Path", _dbPath);
+                b.UseSetting("Db:BackupDir", _dbPath + "-backups"); // 테스트끼리 백업 이름이 겹치지 않게
+            });
             _http = _factory.CreateClient();
             var res = await _http.PostAsJsonAsync("/api/register", new { name = "싱글러", password = "secret123" });
             var token = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
@@ -35,6 +39,7 @@ namespace DiceHeist.Server.Tests
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             foreach (var f in new[] { _dbPath, _dbPath + "-wal", _dbPath + "-shm" })
                 try { File.Delete(f); } catch { }
+            try { Directory.Delete(_dbPath + "-backups", true); } catch { }
         }
 
         async Task<JsonElement> Post(string path, object body = null)

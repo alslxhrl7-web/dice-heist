@@ -78,8 +78,20 @@ namespace DiceHeist.EditorTools
             });
             var summary = report.summary;
             Debug.Log($"[DiceHeist] 빌드 {summary.result}: {output} ({summary.totalSize / (1024 * 1024)} MB, 오류 {summary.totalErrors})");
-            if (Application.isBatchMode && summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
-                EditorApplication.Exit(1);
+            bool ok = summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded;
+            if (Application.isBatchMode)
+            {
+                if (!ok) EditorApplication.Exit(1);
+                return;
+            }
+            // 메뉴로 빌드했을 때 끝났는지 바로 알 수 있게 알린다. DiceHeist.exe는 Unity 실행기라 날짜가 잘 안 바뀌고, 바뀐 게임은 DiceHeist_Data에 들어간다
+            string when = System.DateTime.Now.ToString("HH:mm:ss");
+            if (ok && EditorUtility.DisplayDialog("빌드 성공",
+                    $"{when}에 끝났습니다.\n{Path.GetFullPath(output)}\n크기 {summary.totalSize / (1024 * 1024)} MB · 걸린 시간 {summary.totalTime.TotalSeconds:0}초",
+                    "폴더 열기", "닫기"))
+                EditorUtility.RevealInFinder(output);
+            else if (!ok)
+                EditorUtility.DisplayDialog("빌드 실패", $"{when} · 결과 {summary.result}, 오류 {summary.totalErrors}개.\nConsole 창의 빨간 줄을 확인하세요.", "닫기");
         }
     }
 }

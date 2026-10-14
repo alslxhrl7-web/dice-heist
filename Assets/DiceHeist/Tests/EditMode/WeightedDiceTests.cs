@@ -55,17 +55,33 @@ namespace DiceHeist.Tests
         }
 
         [Test]
-        public void 브론즈에서는_사람이_다섯_판에_네_판쯤_딴다()
+        public void 브론즈에서는_사람이_열_판에_일곱_판쯤_딴다()
         {
-            // 사람도 AI와 같은 기준으로 남기고 항상 따라가는 단순한 방식으로 친다
+            var (win, net) = PlayMany(TableConfig.Bronze, 500);
+            Assert.That(win, Is.InRange(0.65, 0.75), "승률");
+            // AI가 쉽게 폴드하지 않아 팟이 커야 한다: 판당 평균 앤티 1.5배 이상
+            Assert.That(net, Is.GreaterThan(15), "판당 평균 수익");
+        }
+
+        [Test]
+        public void 실버에서는_사람이_열_판에_여섯_판쯤_딴다()
+        {
+            var (win, net) = PlayMany(TableConfig.Silver, 1000);
+            Assert.That(win, Is.InRange(0.55, 0.65), "승률");
+            Assert.That(net, Is.GreaterThan(5), "판당 평균 수익");
+        }
+
+        /// <summary>사람도 AI와 같은 기준으로 남기고 항상 따라가는 단순한 방식으로 여러 판 쳐서 승률과 판당 평균 수익을 잰다.</summary>
+        static (double win, double net) PlayMany(TableConfig cfg, int chips)
+        {
             const int n = 3000;
-            var g = new DiceGame(TableConfig.Bronze, new SeededRandom(2026));
+            var g = new DiceGame(cfg, new SeededRandom(2026));
             int won = 0;
             long net = 0;
             for (int round = 0; round < n; round++)
             {
                 g.RefillAi();
-                g.Human.Chips = 500; // 한도에 막히지 않게 매 판 같은 칩으로
+                g.Human.Chips = chips; // 한도에 막히지 않게 매 판 같은 칩으로
                 int before = g.Human.Chips;
                 g.StartRound();
                 foreach (var p in g.Players)
@@ -82,9 +98,7 @@ namespace DiceHeist.Tests
                 if (g.ResolveShowdown().Winners.Contains(g.Human)) won++;
                 net += g.Human.Chips - before;
             }
-            Assert.That(won / (double)n, Is.InRange(0.74, 0.86), "승률");
-            // AI가 쉽게 폴드하지 않아 팟이 커야 한다: 판당 평균 앤티 2배 이상
-            Assert.That(net / (double)n, Is.GreaterThan(20), "판당 평균 수익");
+            return (won / (double)n, net / (double)n);
         }
 
         [Test]

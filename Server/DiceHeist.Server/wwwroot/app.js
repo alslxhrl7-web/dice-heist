@@ -163,11 +163,10 @@ function renderLobby() {
   ex.disabled = profile.exchangeable < profile.exchangeUnit;
   $('grantBtn').hidden = !devGrant;
 
-  const canPlay = profile.bronzeCleared && profile.money >= profile.buyIn;
-  $('lobbyNote').textContent = !profile.bronzeCleared
-    ? '싱글 브론즈에서 1,000칩을 달성하면 멀티가 열립니다.'
-    : `방에 앉으면 사이버머니 ${fmt(profile.buyIn)}을 테이블로 가져가고, 일어나면 남은 만큼 돌려받습니다.`
-      + (profile.money < profile.buyIn ? ' 지금은 사이버머니가 모자랍니다.' : '');
+  const canPlay = profile.money >= profile.buyIn;
+  $('lobbyNote').textContent =
+    `방에 앉으면 사이버머니 ${fmt(profile.buyIn)}을 테이블로 가져가고, 일어나면 남은 만큼 돌려받습니다.`
+    + (canPlay ? '' : ' 지금은 사이버머니가 모자랍니다. PC 게임(싱글)에서 칩을 벌어 환전하면 채울 수 있습니다.');
   $('createForm').querySelector('button').disabled = !canPlay;
 
   $('rooms').innerHTML = rooms.length ? rooms.map(r => `

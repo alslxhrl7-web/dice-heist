@@ -30,24 +30,27 @@ namespace DiceHeist.Core
         public double AiMisread;
 
         /// <summary>
-        /// 입문 테이블. 500칩으로 시작해 1,000칩까지 벌 수 있고, 한도에 닿으면 멀티가 열린다.
-        /// 주사위 확률은 모두 같고 상대 AI만 서툴다: 다시 굴리기 1회, 90% 확률로 제 패를 거꾸로 읽는다.
-        /// 사람이 AI와 같은 기준으로 남기고 콜만 해도 다섯 판에 네 판쯤(약 80%) 이기고, 판당 평균 +30칩쯤 번다.
+        /// 입문 테이블. 500칩으로 시작해 1,000칩까지 벌 수 있다.
+        /// 주사위 확률은 모두 같고 상대 AI만 서툴다: 다시 굴리기 1회, 65% 확률로 제 패를 거꾸로 읽는다.
+        /// 사람이 AI와 같은 기준으로 남기고 콜만 해도 약 70% 이기고, 판당 평균 +21칩쯤 번다.
         /// </summary>
         public static TableConfig Bronze => new TableConfig
         {
             Name = "브론즈", MinChips = 0, ChipCap = 1000, Ante = 10, StartChips = 500,
-            AiMaxRerolls = 1, AiMisread = 0.9,
+            AiMaxRerolls = 1, AiMisread = 0.65,
         };
 
-        /// <summary>브론즈 한도에 한 번이라도 닿으면(브론즈를 지나면) 멀티가 열린다.</summary>
+        /// <summary>브론즈 한도에 한 번이라도 닿았는지(기록용. 멀티 입장 조건은 아니다).</summary>
         public static bool ClearsBronze(int chips) => chips >= Bronze.ChipCap;
 
-        /// <summary>700칩 이상 가지고 있어야 입장, 1,500칩까지. AI는 다시 굴리기 2회에 배짱은 절반.</summary>
+        /// <summary>
+        /// 700칩 이상 가지고 있어야 입장, 1,500칩까지. AI는 다시 굴리기 2회, 배짱은 절반, 30% 확률로 제 패를 거꾸로 읽는다.
+        /// 브론즈와 같은 방식으로 치면 약 60% 이기고, 판당 평균 +13칩쯤 번다.
+        /// </summary>
         public static TableConfig Silver => new TableConfig
         {
             Name = "실버", MinChips = 700, ChipCap = 1500, Ante = 20, AiStartChips = 1500,
-            AiMaxRerolls = 2, AiNerve = 0.5,
+            AiMaxRerolls = 2, AiNerve = 0.5, AiMisread = 0.3,
         };
 
         /// <summary>1,000칩 이상 가지고 있어야 입장, 2,000칩까지. AI는 제 실력(웹 프로토타입과 같은 판단).</summary>

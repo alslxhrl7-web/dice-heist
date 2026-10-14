@@ -56,6 +56,26 @@ CREATE TABLE IF NOT EXISTS ledger (
   money INTEGER NOT NULL DEFAULT 0,
   at TEXT NOT NULL
 );");
+            // 시작 머니를 아직 못 받은 계정(이 기능 전에 가입한 사람)에게 한 번 준다
+            using var tx = c.BeginTransaction();
+            using (var cmd = c.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM ledger WHERE kind = 'starter')";
+                var ids = new List<long>();
+                using (var r = cmd.ExecuteReader()) while (r.Read()) ids.Add(r.GetInt64(0));
+                foreach (var id in ids) GiveStarter(c, tx, id);
+            }
+            tx.Commit();
+        }
+
+        /// <summary>가입하면 받는 사이버머니. 멀티 바이인 두 번어치라, 한 번 져도 다시 앉을 수 있다.</summary>
+        public const long StarterMoney = 100_000;
+
+        static void GiveStarter(SqliteConnection c, SqliteTransaction tx, long userId)
+        {
+            Exec(c, tx, "UPDATE users SET money = money + $m WHERE id = $u", ("$m", StarterMoney), ("$u", userId));
+            Ledger(c, tx, userId, "starter", 0, StarterMoney);
         }
 
         SqliteConnection Open()
@@ -91,22 +111,26 @@ CREATE TABLE IF NOT EXISTS ledger (
 
         // ---------- 계정 ----------
 
-        /// <summary>새 계정. 이름이 이미 있으면 null.</summary>
+        /// <summary>새 계정(시작 머니 포함). 이름이 이미 있으면 null.</summary>
         public long? CreateUser(string name, string password)
         {
             var salt = RandomNumberGenerator.GetBytes(16);
             var hash = Passwords.Hash(password, salt);
             using var c = Open();
+            using var tx = c.BeginTransaction();
             try
             {
-                Exec(c, null, "INSERT INTO users(name, pw_hash, pw_salt, chips, created_at) VALUES ($n, $h, $s, $c, $t)",
+                Exec(c, tx, "INSERT INTO users(name, pw_hash, pw_salt, chips, created_at) VALUES ($n, $h, $s, $c, $t)",
                     ("$n", name), ("$h", hash), ("$s", salt), ("$c", TableConfig.Bronze.StartChips), ("$t", Now()));
             }
             catch (SqliteException e) when (e.SqliteErrorCode == 19) // UNIQUE
             {
                 return null;
             }
-            return (long)Scalar(c, null, "SELECT last_insert_rowid()");
+            long id = (long)Scalar(c, tx, "SELECT last_insert_rowid()");
+            GiveStarter(c, tx, id);
+            tx.Commit();
+            return id;
         }
 
         public bool NameExists(string name)

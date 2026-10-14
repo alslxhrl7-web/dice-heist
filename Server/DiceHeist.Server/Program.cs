@@ -121,8 +121,7 @@ app.MapPost("/api/exchange", (HttpRequest req, ExchangeRequest e) =>
     return err != null ? Results.BadRequest(new { error = err }) : Profile(uid);
 });
 
-// 시험용: 싱글이 아직 서버에 없어서, 멀티를 해 보려면 머니와 브론즈 통과가 필요하다.
-// 개발 모드에서는 항상 켜지고, 운영(서비스)에서는 Dev:AllowGrant가 true일 때만 켜진다. 공개 전에 끈다
+// 시험용: 머니를 더 받는다. 개발 모드에서는 항상 켜지고, 운영(서비스)에서는 Dev:AllowGrant가 true일 때만 켜진다. 공개 전에 끈다
 bool allowGrant = app.Environment.IsDevelopment() || app.Configuration.GetValue("Dev:AllowGrant", false);
 app.MapGet("/api/config", () => new { devGrant = allowGrant });
 if (allowGrant)

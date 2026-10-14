@@ -88,7 +88,6 @@ namespace DiceHeist.Server.Multi
             if (room.Seats.Count >= Room.MaxSeats) return "방이 꽉 찼습니다.";
             var user = _db.GetUser(userId);
             if (user == null) return "계정을 찾을 수 없습니다.";
-            if (!user.BronzeCleared) return $"싱글 브론즈에서 {TableConfig.Bronze.ChipCap:N0}칩을 달성해야 멀티가 열립니다.";
             if (!_db.BuyIn(userId, room.Id, Room.BuyIn)) return $"사이버머니가 {Room.BuyIn:N0} 이상 있어야 앉을 수 있습니다.";
             room.Sit(new RoomSeat
             {

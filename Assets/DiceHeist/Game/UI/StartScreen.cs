@@ -31,7 +31,6 @@ namespace DiceHeist.Game
         TMP_FontAsset _font;
         int _chips;
         long _money;
-        bool _multiOpen;
         bool _online;
         string _account;
         string _notice;
@@ -45,7 +44,6 @@ namespace DiceHeist.Game
             screen._font = font;
             screen._chips = profile.chips;
             screen._money = profile.money;
-            screen._multiOpen = profile.bronzeCleared;
             screen._online = online;
             screen._account = profile.name;
             screen._notice = notice;
@@ -101,11 +99,10 @@ namespace DiceHeist.Game
                 btn.interactable = open;
             }
 
-            // 멀티: 브론즈 한도에 한 번이라도 닿으면 열린다. 사이버머니로 사람끼리 겨루는 곳(브라우저 사이트)
-            bool multiOpen = _multiOpen && _online;
+            // 멀티: 로그인하면 열린다(가입 때 받는 사이버머니로 바로 앉을 수 있다). 사람끼리 겨루는 곳(브라우저 사이트)
+            bool multiOpen = _online;
             string multiState = multiOpen ? "<color=#2c8a57>열림</color> · 사이트 열기"
-                : !_online ? "<color=#8b958f>로그인해야 이용</color>"
-                : $"<color=#8b958f>브론즈 {TableConfig.Bronze.ChipCap:N0}칩 달성 시</color>";
+                : "<color=#8b958f>로그인해야 이용</color>";
             var multi = Button(card, "Btn_multi", $"<size=36><b>멀티</b></size>\n사이버머니로 사람과\n{multiState}",
                 multiOpen ? Accent : Locked, new Vector2(345, 118), new Vector2(220, 170), 21, () => MultiRequested?.Invoke());
             multi.interactable = multiOpen;
