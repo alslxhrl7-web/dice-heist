@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,9 +18,9 @@ namespace DiceHeist.Game
         public Canvas Canvas { get; private set; }
         public event Action StartClicked;
 
-        Font _font;
+        TMP_FontAsset _font;
 
-        public static StartScreen Build(Font font)
+        public static StartScreen Build(TMP_FontAsset font)
         {
             var go = new GameObject("StartScreen", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var screen = go.AddComponent<StartScreen>();
@@ -51,8 +52,9 @@ namespace DiceHeist.Game
 
             Label(card, "다이스 하이스트", 104, Ink, 500, 140);
             Label(card, "동물들이 주사위 5개로 포커 족보를 겨루는 베팅 게임", 30, Muted, 392, 50);
-            Label(card, "브론즈 테이블 · 참가비 10칩 · 나(토끼) vs 너구리 · 고양이", 26, Ink, 316, 44);
-            Label(card, "굴리기  →  남기기(최대 2회)  →  걸기(포기 · 따라가기 · 올리기)  →  공개", 24, Muted, 268, 40);
+            Label(card, "브론즈 테이블 · 앤티 (참가비) 10칩 · 나(토끼) vs 너구리 · 고양이", 26, Ink, 316, 44);
+            Label(card, "굴리기  →  남기기(최대 2회)  →  베팅  →  쇼다운(공개)", 24, Muted, 268, 40);
+            Label(card, "베팅: 폴드(포기) · 콜(따라가기, 1배) · 레이즈(올리기, 3배)  ·  배수는 앤티 기준", 20, Muted, 232, 32);
 
             Button(card, "Btn_start", "게임 시작", Accent, new Vector2(0, 132), new Vector2(360, 92), 36, () => StartClicked?.Invoke());
             Button(card, "Btn_quit", "나가기", Plain, new Vector2(0, 46), new Vector2(220, 60), 24, Application.Quit);
@@ -68,7 +70,7 @@ namespace DiceHeist.Game
         }
 
         /// <summary>카드 아래쪽에서 bottom만큼 올라온 자리에 가운데 정렬한 한 줄.</summary>
-        Text Label(RectTransform parent, string text, int size, Color color, float bottom, float height)
+        TextMeshProUGUI Label(RectTransform parent, string text, int size, Color color, float bottom, float height)
         {
             var rect = NewRect("Text", parent);
             rect.anchorMin = new Vector2(0, 0);
@@ -76,15 +78,15 @@ namespace DiceHeist.Game
             rect.pivot = new Vector2(0.5f, 0);
             rect.anchoredPosition = new Vector2(0, bottom);
             rect.sizeDelta = new Vector2(0, height);
-            var t = rect.gameObject.AddComponent<Text>();
+            var t = rect.gameObject.AddComponent<TextMeshProUGUI>();
             t.font = _font;
             t.fontSize = size;
-            t.alignment = TextAnchor.MiddleCenter;
+            t.alignment = TextAlignmentOptions.Center;
             t.color = color;
             t.text = text;
             t.raycastTarget = false;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            t.overflowMode = TextOverflowModes.Overflow;
             return t;
         }
 

@@ -19,6 +19,13 @@ namespace DiceHeist.Game
         long _seed;
         bool _auto;
 
+        // 포커 용어 (우리말)
+        const string Fold = "폴드 (포기)";
+        const string Call = "콜 (따라가기)";
+        const string Raise = "레이즈 (올리기)";
+        const string Ante = "앤티 (참가비)";
+        const string Pot = "팟 (판돈)";
+
         readonly bool[] _held = new bool[5];
         readonly List<string> _logs = new List<string>();
         string _choice;
@@ -70,7 +77,7 @@ namespace DiceHeist.Game
 
             // 1. 굴리기
             _game.StartRound();
-            Log($"{_game.RoundNo}판 시작 · 참가비 {_game.Ante}칩씩");
+            Log($"{_game.RoundNo}판 시작 · {Ante} {_game.Ante}칩씩");
             Phase = "rolling";
             _turn = null;
             _showHand = false;
@@ -153,17 +160,17 @@ namespace DiceHeist.Game
                     int callCost = bet.CallCost(p);
                     var buttons = new List<ButtonSpec>
                     {
-                        new ButtonSpec("fold", "포기"),
-                        new ButtonSpec("call", $"따라가기 +{callCost}", ButtonStyle.Primary, bet.CanCall(p)),
+                        new ButtonSpec("fold", Fold),
+                        new ButtonSpec("call", $"{Call}\n<size=20>+{callCost}칩 · {Times(bet.Level)}</size>", ButtonStyle.Primary, bet.CanCall(p)),
                     };
                     if (bet.Responding)
-                        _hud.SetHint("내 뒤에서 올리기가 나왔습니다. 차액을 내고 따라갈까요?");
+                        _hud.SetHint($"내 뒤에서 레이즈(올리기)가 나와 {Times(bet.Level)}가 됐습니다. 차액을 내고 콜(따라가기)할까요?");
                     else if (bet.RaiseUsed)
-                        _hud.SetHint("누군가 올렸습니다. 따라가려면 올린 만큼 내야 합니다.");
+                        _hud.SetHint($"누군가 레이즈(올리기)해서 {Times(bet.Level)}가 됐습니다. 콜(따라가기)하려면 그만큼 내야 합니다.");
                     else
                     {
-                        _hud.SetHint("포기하거나, 따라가거나, 올리세요. 올리기는 판당 한 명만.");
-                        buttons.Add(new ButtonSpec("raise", $"올리기 +{bet.RaiseCost(p)}", ButtonStyle.Raise, bet.CanRaise(p)));
+                        _hud.SetHint($"배수는 앤티(참가비) {_game.Ante}칩 기준. 레이즈(올리기)는 판당 한 명만, {Times(_game.RaiseTotal)}까지.");
+                        buttons.Add(new ButtonSpec("raise", $"{Raise}\n<size=20>+{bet.RaiseCost(p)}칩 · {Times(_game.RaiseTotal)}</size>", ButtonStyle.Raise, bet.CanRaise(p)));
                     }
                     Refresh();
                     yield return Choose(buttons.ToArray());
@@ -175,14 +182,14 @@ namespace DiceHeist.Game
                 switch (act)
                 {
                     case BetAction.Fold:
-                        Log($"{p.Name} · 포기");
+                        Log($"{p.Name} · {Fold}");
                         animal.SetDroop(true);
                         break;
                     case BetAction.Call:
-                        Log($"{p.Name} · 따라가기 (+{paid})");
+                        Log($"{p.Name} · {Call} +{paid} · {Times(p.Contrib)}");
                         break;
                     case BetAction.Raise:
-                        Log($"{p.Name} · 올리기 (+{paid})");
+                        Log($"{p.Name} · {Raise} +{paid} · {Times(p.Contrib)}");
                         StartCoroutine(animal.Bounce());
                         break;
                 }
@@ -203,8 +210,8 @@ namespace DiceHeist.Game
             if (res.Uncontested)
             {
                 var w = res.Winners[0];
-                Log($"{w.Name} · 판돈 {pot}칩 획득 (공개 없이)");
-                _hud.ShowBanner($"{w.Name} 승리 · 나머지가 모두 포기 · +{pot}칩", iWon);
+                Log($"{w.Name} · {Pot} {pot}칩 획득 (쇼다운 없이)");
+                _hud.ShowBanner($"{w.Name} 승리 · 나머지가 모두 폴드(포기) · +{pot}칩", iWon);
             }
             else
             {
@@ -294,6 +301,9 @@ namespace DiceHeist.Game
 
         // ---------- 화면 갱신 ----------
 
+        /// <summary>걸기 금액을 앤티 기준 배수로. 앤티 10칩일 때 10칩은 1배, 30칩은 3배.</summary>
+        string Times(int amount) => $"{amount / (double)_game.Ante:0.#}배";
+
         void Log(string line)
         {
             _logs.Insert(0, line);
@@ -313,9 +323,9 @@ namespace DiceHeist.Game
             foreach (var p in _game.Players)
             {
                 string first = _game.RoundNo > 0 && _game.Starter == p.Index ? "  <color=#b07a00><b>선</b></color>" : "";
-                string status = p.Status == SeatStatus.Raised ? "<color=#c4426a><b>올리기</b></color>"
-                    : p.Status == SeatStatus.Called ? "<color=#2c8a57><b>따라가기</b></color>"
-                    : p.Status == SeatStatus.Folded ? "포기" : "대기";
+                string status = p.Status == SeatStatus.Raised ? $"<color=#c4426a><b>{Raise}</b> {Times(p.Contrib)}</color>"
+                    : p.Status == SeatStatus.Called ? $"<color=#2c8a57><b>{Call}</b> {Times(p.Contrib)}</color>"
+                    : p.Status == SeatStatus.Folded ? Fold : "대기";
                 string text = $"<b>{p.Name}</b>{first}  {p.Chips:N0}칩\n리롤 {p.Rerolls}회 · {status}";
                 // 상대 족보는 공개된 뒤에만 보여준다
                 if (p.IsAi) text = $"<size=17><color=#5a6c64>{p.Ai.Tag}</color></size>\n" + text;

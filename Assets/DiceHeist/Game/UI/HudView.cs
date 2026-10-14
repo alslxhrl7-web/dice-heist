@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DiceHeist.Core;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -49,17 +50,17 @@ namespace DiceHeist.Game
         };
 
         public Canvas Canvas { get; private set; }
-        public Font Font => _font;
+        public TMP_FontAsset Font => _font;
         public event Action<string> ButtonClicked;
 
-        Font _font;
+        TMP_FontAsset _font;
         Camera _cam;
         RectTransform _canvasRect;
-        Text _stats, _hand, _handSub, _hint, _log, _bannerText, _potText;
+        TextMeshProUGUI _stats, _hand, _handSub, _hint, _log, _bannerText, _potText;
         Image _bannerBg;
         RectTransform _buttonRow;
         readonly List<(Transform anchor, RectTransform rect)> _followers = new List<(Transform, RectTransform)>();
-        readonly Text[] _seatTexts = new Text[3];
+        readonly TextMeshProUGUI[] _seatTexts = new TextMeshProUGUI[3];
         readonly Image[] _seatBgs = new Image[3];
 
         public static HudView Build(Camera cam, Transform[] seatAnchors, Transform potAnchor)
@@ -75,8 +76,7 @@ namespace DiceHeist.Game
             scaler.matchWidthOrHeight = 0.5f;
             hud._canvasRect = (RectTransform)go.transform;
 
-            hud._font = Font.CreateDynamicFontFromOSFont(new[] { "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Arial" }, 32);
-            if (hud._font == null) hud._font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            hud._font = UiFont.Korean;
 
             if (FindAnyObjectByType<EventSystem>() == null)
             {
@@ -94,26 +94,26 @@ namespace DiceHeist.Game
 
             // 왼쪽 위: 제목과 통계
             var top = Panel(root, new Vector2(0, 0), new Vector2(0, 0), new Vector2(24, 20), new Vector2(430, 190));
-            var title = Label(top, "다이스 하이스트", 38, TextAnchor.UpperLeft, Ink);
+            var title = Label(top, "다이스 하이스트", 38, TextAlignmentOptions.TopLeft, Ink);
             Stretch(title.rectTransform, 18, 12, 18, 12);
-            var sub = Label(top, "프로토타입 · 브론즈 테이블 · 참가비 10칩", 20, TextAnchor.UpperLeft, Muted);
+            var sub = Label(top, "프로토타입 · 브론즈 테이블 · 앤티 (참가비) 10칩", 20, TextAlignmentOptions.TopLeft, Muted);
             Stretch(sub.rectTransform, 18, 62, 18, 12);
-            _stats = Label(top, "", 24, TextAnchor.LowerLeft, Ink);
+            _stats = Label(top, "", 24, TextAlignmentOptions.BottomLeft, Ink);
             Stretch(_stats.rectTransform, 18, 12, 18, 14);
 
             // 오른쪽 위: 진행 기록
             var logPanel = Panel(root, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-24, 20), new Vector2(470, 235));
-            var logTitle = Label(logPanel, "진행 기록", 24, TextAnchor.UpperLeft, Ink);
+            var logTitle = Label(logPanel, "진행 기록", 24, TextAlignmentOptions.TopLeft, Ink);
             Stretch(logTitle.rectTransform, 18, 12, 18, 12);
-            _log = Label(logPanel, "", 20, TextAnchor.UpperLeft, Muted);
-            _log.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _log = Label(logPanel, "", 20, TextAlignmentOptions.TopLeft, Muted);
+            _log.textWrappingMode = TextWrappingModes.Normal;
             Stretch(_log.rectTransform, 18, 50, 18, 10);
 
             // 왼쪽 위: 족보 표 (높은 순)
             var ranks = Panel(root, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -20), new Vector2(336, 250));
-            var ranksTitle = Label(ranks, "족보 (높은 순)", 24, TextAnchor.UpperLeft, Ink);
+            var ranksTitle = Label(ranks, "족보 (높은 순)", 24, TextAlignmentOptions.TopLeft, Ink);
             Stretch(ranksTitle.rectTransform, 18, 12, 18, 12);
-            var ranksHead = Label(ranks, "1회 굴림 확률", 17, TextAnchor.UpperRight, Muted);
+            var ranksHead = Label(ranks, "1회 굴림 확률", 17, TextAlignmentOptions.TopRight, Muted);
             Stretch(ranksHead.rectTransform, 18, 18, 18, 12);
             var names = new List<string>();
             var odds = new List<string>();
@@ -122,27 +122,27 @@ namespace DiceHeist.Game
                 names.Add(HandEvaluator.NameOf((HandRank)r));
                 odds.Add($"{WeightedDice.RankWeights[r] / 10.0:0.0}%");
             }
-            var rankNames = Label(ranks, string.Join("\n", names), 19, TextAnchor.UpperLeft, Ink);
+            var rankNames = Label(ranks, string.Join("\n", names), 19, TextAlignmentOptions.TopLeft, Ink);
             Stretch(rankNames.rectTransform, 18, 52, 18, 10);
-            var rankExamples = Label(ranks, string.Join("\n", RankExamples), 19, TextAnchor.UpperLeft, Muted);
+            var rankExamples = Label(ranks, string.Join("\n", RankExamples), 19, TextAlignmentOptions.TopLeft, Muted);
             Stretch(rankExamples.rectTransform, 152, 52, 18, 10);
-            var rankOdds = Label(ranks, string.Join("\n", odds), 19, TextAnchor.UpperRight, Ink);
+            var rankOdds = Label(ranks, string.Join("\n", odds), 19, TextAlignmentOptions.TopRight, Ink);
             Stretch(rankOdds.rectTransform, 18, 52, 18, 10);
 
             // 가운데 위: 결과 배너
             var banner = Panel(root, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(820, 70));
             _bannerBg = banner.GetComponent<Image>();
-            _bannerText = Label(banner, "", 30, TextAnchor.MiddleCenter, Ink);
+            _bannerText = Label(banner, "", 30, TextAlignmentOptions.Center, Ink);
             Stretch(_bannerText.rectTransform, 10, 4, 10, 4);
             banner.gameObject.SetActive(false);
 
             // 아래 가운데: 내 족보, 안내, 버튼
             var bottom = Panel(root, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(900, 215));
-            _hand = Label(bottom, "…", 44, TextAnchor.UpperCenter, Ink);
+            _hand = Label(bottom, "…", 44, TextAlignmentOptions.Top, Ink);
             Stretch(_hand.rectTransform, 10, 8, 10, 10);
-            _handSub = Label(bottom, "지금 내 족보", 19, TextAnchor.UpperCenter, Muted);
+            _handSub = Label(bottom, "지금 내 족보", 19, TextAlignmentOptions.Top, Muted);
             Stretch(_handSub.rectTransform, 10, 62, 10, 10);
-            _hint = Label(bottom, "", 21, TextAnchor.LowerCenter, Muted);
+            _hint = Label(bottom, "", 21, TextAlignmentOptions.Bottom, Muted);
             Stretch(_hint.rectTransform, 10, 10, 10, 10);
 
             _buttonRow = NewRect("Buttons", bottom);
@@ -160,14 +160,14 @@ namespace DiceHeist.Game
             // 자리 이름표와 판돈: 3D 위치를 따라다닌다
             for (int i = 0; i < seatAnchors.Length; i++)
             {
-                var tag = Panel(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, i == 0 ? 80 : 124));
+                var tag = Panel(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(360, i == 0 ? 80 : 124));
                 _seatBgs[i] = tag.GetComponent<Image>();
-                _seatTexts[i] = Label(tag, "", 21, TextAnchor.MiddleCenter, Ink);
+                _seatTexts[i] = Label(tag, "", 21, TextAlignmentOptions.Center, Ink);
                 Stretch(_seatTexts[i].rectTransform, 8, 4, 8, 4);
                 _followers.Add((seatAnchors[i], tag));
             }
-            var pot = Panel(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190, 52));
-            _potText = Label(pot, "", 30, TextAnchor.MiddleCenter, Ink);
+            var pot = Panel(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(250, 52));
+            _potText = Label(pot, "", 30, TextAlignmentOptions.Center, Ink);
             Stretch(_potText.rectTransform, 6, 2, 6, 2);
             _followers.Add((potAnchor, pot));
         }
@@ -192,7 +192,7 @@ namespace DiceHeist.Game
 
         public void SetHand(string name) => _hand.text = name;
         public void SetHint(string hint) => _hint.text = hint;
-        public void SetPot(int pot) => _potText.text = $"판돈 <b>{pot}</b>";
+        public void SetPot(int pot) => _potText.text = $"팟 (판돈) <b>{pot}</b>";
         public void SetLog(IEnumerable<string> lines) => _log.text = string.Join("\n", lines);
 
         public void SetSeat(int seat, string richText, bool turn, bool folded, bool winner)
@@ -224,20 +224,29 @@ namespace DiceHeist.Game
                 Color bg = spec.Style == ButtonStyle.Primary ? Accent : spec.Style == ButtonStyle.Raise ? Raise : new Color(0.88f, 0.92f, 0.89f);
                 img.color = bg;
                 var le = rect.gameObject.AddComponent<LayoutElement>();
-                le.preferredWidth = Mathf.Max(200, 60 + spec.Label.Length * 27);
+                le.preferredWidth = Mathf.Max(200, 60 + LongestLine(spec.Label) * 25);
                 le.preferredHeight = 68;
                 var btn = rect.gameObject.AddComponent<Button>();
                 btn.targetGraphic = img;
                 btn.interactable = spec.Enabled;
                 string id = spec.Id;
                 btn.onClick.AddListener(() => ButtonClicked?.Invoke(id));
-                var label = Label(rect, spec.Label, 27, TextAnchor.MiddleCenter, spec.Style == ButtonStyle.Raise ? Color.white : Ink);
+                var label = Label(rect, spec.Label, 27, TextAlignmentOptions.Center, spec.Style == ButtonStyle.Raise ? Color.white : Ink);
                 Stretch(label.rectTransform, 4, 2, 4, 2);
                 if (!spec.Enabled) label.color = new Color(label.color.r, label.color.g, label.color.b, 0.45f);
             }
         }
 
         // ---------- 조립 도우미 ----------
+
+        /// <summary>서식 태그를 뺀 가장 긴 줄의 글자 수. 버튼 너비 계산용.</summary>
+        static int LongestLine(string label)
+        {
+            int best = 0;
+            foreach (var line in System.Text.RegularExpressions.Regex.Replace(label, "<[^>]*>", "").Split('\n'))
+                best = Mathf.Max(best, line.Length);
+            return best;
+        }
 
         static RectTransform NewRect(string name, Transform parent)
         {
@@ -259,19 +268,19 @@ namespace DiceHeist.Game
             return rect;
         }
 
-        Text Label(Transform parent, string text, int size, TextAnchor align, Color color)
+        TextMeshProUGUI Label(Transform parent, string text, int size, TextAlignmentOptions align, Color color)
         {
             var rect = NewRect("Text", parent);
-            var t = rect.gameObject.AddComponent<Text>();
+            var t = rect.gameObject.AddComponent<TextMeshProUGUI>();
             t.font = _font;
             t.fontSize = size;
             t.alignment = align;
             t.color = color;
             t.text = text;
-            t.supportRichText = true;
+            t.richText = true;
             t.raycastTarget = false;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            t.overflowMode = TextOverflowModes.Overflow;
             return t;
         }
 
