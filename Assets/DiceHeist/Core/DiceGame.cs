@@ -92,6 +92,7 @@ namespace DiceHeist.Core
         readonly List<PlayerState> _players = new List<PlayerState>();
 
         public IReadOnlyList<PlayerState> Players => _players;
+        /// <summary>싱글에서 사람 자리(0번). 멀티에서는 그냥 0번 자리.</summary>
         public PlayerState Human => _players[0];
         public int Ante => _cfg.Ante;
         public int RaiseTotal => _cfg.Ante * _cfg.RaiseMultiplier;
@@ -107,14 +108,43 @@ namespace DiceHeist.Core
 
         int _humanChipsAtStart;
 
+        /// <summary>싱글: 나 + AI 너구리·고양이.</summary>
         /// <param name="humanChips">사람이 가지고 앉는 칩. 음수면 cfg.StartChips(처음 시작).</param>
         public DiceGame(TableConfig cfg, IRandom rng, int humanChips = -1)
+            : this(cfg, rng, new[]
+            {
+                new Seat("me", "나", humanChips >= 0 ? humanChips : cfg.StartChips, null),
+                new Seat("rac", "너구리", cfg.AiStartChips, AiProfile.Raccoon),
+                new Seat("cat", "고양이", cfg.AiStartChips, AiProfile.Cat),
+            })
+        {
+        }
+
+        /// <summary>자리를 직접 정한다(멀티). 0번 자리가 첫 판의 선이다.</summary>
+        public DiceGame(TableConfig cfg, IRandom rng, IReadOnlyList<Seat> seats)
         {
             _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
             _rng = rng ?? throw new ArgumentNullException(nameof(rng));
-            _players.Add(new PlayerState(0, "me", "나", humanChips >= 0 ? humanChips : cfg.StartChips, null));
-            _players.Add(new PlayerState(1, "rac", "너구리", cfg.AiStartChips, AiProfile.Raccoon));
-            _players.Add(new PlayerState(2, "cat", "고양이", cfg.AiStartChips, AiProfile.Cat));
+            if (seats == null || seats.Count < 2) throw new ArgumentException("자리는 2개 이상이어야 합니다.", nameof(seats));
+            for (int i = 0; i < seats.Count; i++)
+                _players.Add(new PlayerState(i, seats[i].Id, seats[i].Name, seats[i].Chips, seats[i].Ai));
+        }
+
+        /// <summary>판에 앉는 한 자리. Ai가 null이면 사람.</summary>
+        public sealed class Seat
+        {
+            public readonly string Id;
+            public readonly string Name;
+            public readonly int Chips;
+            public readonly AiProfile Ai;
+
+            public Seat(string id, string name, int chips, AiProfile ai = null)
+            {
+                Id = id;
+                Name = name;
+                Chips = chips;
+                Ai = ai;
+            }
         }
 
         public bool HumanIsBroke => Human.Chips < _cfg.Ante;
@@ -145,6 +175,8 @@ namespace DiceHeist.Core
         public void StartRound()
         {
             if (HumanIsBroke) throw new InvalidOperationException("참가비가 모자랍니다. Rescue를 먼저 호출하세요.");
+            foreach (var p in _players)
+                if (p.Chips < _cfg.Ante) throw new InvalidOperationException($"{p.Name}의 칩이 참가비보다 적습니다.");
             _humanChipsAtStart = Human.Chips;
             RoundNo++;
             Starter = (RoundNo - 1) % _players.Count;
