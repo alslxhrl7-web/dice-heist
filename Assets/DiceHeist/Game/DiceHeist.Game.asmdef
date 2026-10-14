@@ -3,6 +3,7 @@
     "rootNamespace": "DiceHeist.Game",
     "references": [
         "DiceHeist.Core",
+        "Unity.InputSystem",
         "UnityEngine.UI"
     ],
     "includePlatforms": [],

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using DiceHeist.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace DiceHeist.Game
@@ -39,6 +41,16 @@ namespace DiceHeist.Game
         static readonly Color Raise = new Color(0.77f, 0.26f, 0.42f);
         static readonly Color Good = new Color(0.17f, 0.54f, 0.34f);
 
+        // 족보 표: 파이브 다이스부터 노페어까지. 확률은 7,776가지 중 해당 족보의 비율
+        static readonly string[] RankExamples =
+        {
+            "4 4 4 4 4", "6 6 6 6 2", "2 3 4 5 6", "5 5 5 3 3", "2 2 2 5 6", "6 6 3 3 1", "4 4 1 3 6", "1 2 4 5 6",
+        };
+        static readonly string[] RankOdds =
+        {
+            "0.08%", "1.93%", "3.09%", "3.86%", "15.43%", "23.15%", "46.30%", "6.17%",
+        };
+
         public Canvas Canvas { get; private set; }
         public event Action<string> ButtonClicked;
 
@@ -69,7 +81,10 @@ namespace DiceHeist.Game
             if (hud._font == null) hud._font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             if (FindAnyObjectByType<EventSystem>() == null)
-                new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            {
+                var module = new GameObject("EventSystem", typeof(EventSystem)).AddComponent<InputSystemUIInputModule>();
+                if (module.actionsAsset == null) module.AssignDefaultActions();
+            }
 
             hud.BuildLayout(seatAnchors, potAnchor);
             return hud;
@@ -95,6 +110,21 @@ namespace DiceHeist.Game
             _log = Label(logPanel, "", 20, TextAnchor.UpperLeft, Muted);
             _log.horizontalOverflow = HorizontalWrapMode.Wrap;
             Stretch(_log.rectTransform, 18, 50, 18, 10);
+
+            // 왼쪽 위: 족보 표 (높은 순)
+            var ranks = Panel(root, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -20), new Vector2(336, 250));
+            var ranksTitle = Label(ranks, "족보 (높은 순)", 24, TextAnchor.UpperLeft, Ink);
+            Stretch(ranksTitle.rectTransform, 18, 12, 18, 12);
+            var ranksHead = Label(ranks, "1회 굴림 확률", 17, TextAnchor.UpperRight, Muted);
+            Stretch(ranksHead.rectTransform, 18, 18, 18, 12);
+            var names = new List<string>();
+            for (int r = 7; r >= 0; r--) names.Add(HandEvaluator.NameOf((HandRank)r));
+            var rankNames = Label(ranks, string.Join("\n", names), 19, TextAnchor.UpperLeft, Ink);
+            Stretch(rankNames.rectTransform, 18, 52, 18, 10);
+            var rankExamples = Label(ranks, string.Join("\n", RankExamples), 19, TextAnchor.UpperLeft, Muted);
+            Stretch(rankExamples.rectTransform, 152, 52, 18, 10);
+            var rankOdds = Label(ranks, string.Join("\n", RankOdds), 19, TextAnchor.UpperRight, Ink);
+            Stretch(rankOdds.rectTransform, 18, 52, 18, 10);
 
             // 가운데 위: 결과 배너
             var banner = Panel(root, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(820, 70));
