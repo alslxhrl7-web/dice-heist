@@ -63,7 +63,20 @@ namespace DiceHeist.EditorTools
             Debug.Log("[DiceHeist] 기준 머티리얼 생성: " + path);
         }
 
-        /// <summary>Windows 실행 파일을 Builds/Windows에 만든다.</summary>
+        /// <summary>
+        /// 빌드 폴더를 통째로 Builds/DiceHeist-Windows.zip으로 묶는다(이전 zip은 덮어씀). 받은 사람은 압축을 풀고 DiceHeist.exe를 실행한다.
+        /// 빌드 폴더 안에 zip을 만들지 않는 이유: 다음 압축에 이전 zip이 섞여 들어간다.
+        /// </summary>
+        static string ZipBuild(string buildDir)
+        {
+            string zip = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(buildDir), "DiceHeist-Windows.zip"));
+            if (File.Exists(zip)) File.Delete(zip);
+            System.IO.Compression.ZipFile.CreateFromDirectory(Path.GetFullPath(buildDir), zip,
+                System.IO.Compression.CompressionLevel.Optimal, includeBaseDirectory: true);
+            return zip;
+        }
+
+        /// <summary>Windows 실행 파일을 Builds/Windows에 만들고, 보내기 좋게 zip으로도 묶는다.</summary>
         [MenuItem("DiceHeist/Windows 빌드")]
         public static void BuildWindows()
         {
@@ -79,6 +92,12 @@ namespace DiceHeist.EditorTools
             var summary = report.summary;
             Debug.Log($"[DiceHeist] 빌드 {summary.result}: {output} ({summary.totalSize / (1024 * 1024)} MB, 오류 {summary.totalErrors})");
             bool ok = summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded;
+            string zip = null;
+            if (ok)
+            {
+                zip = ZipBuild(Path.GetDirectoryName(output));
+                Debug.Log($"[DiceHeist] 압축: {zip} ({new FileInfo(zip).Length / (1024 * 1024)} MB)");
+            }
             if (Application.isBatchMode)
             {
                 if (!ok) EditorApplication.Exit(1);
@@ -87,9 +106,9 @@ namespace DiceHeist.EditorTools
             // 메뉴로 빌드했을 때 끝났는지 바로 알 수 있게 알린다. DiceHeist.exe는 Unity 실행기라 날짜가 잘 안 바뀌고, 바뀐 게임은 DiceHeist_Data에 들어간다
             string when = System.DateTime.Now.ToString("HH:mm:ss");
             if (ok && EditorUtility.DisplayDialog("빌드 성공",
-                    $"{when}에 끝났습니다.\n{Path.GetFullPath(output)}\n크기 {summary.totalSize / (1024 * 1024)} MB · 걸린 시간 {summary.totalTime.TotalSeconds:0}초",
+                    $"{when}에 끝났습니다.\n보낼 파일: {zip}\n크기 {new FileInfo(zip).Length / (1024 * 1024)} MB · 걸린 시간 {summary.totalTime.TotalSeconds:0}초",
                     "폴더 열기", "닫기"))
-                EditorUtility.RevealInFinder(output);
+                EditorUtility.RevealInFinder(zip);
             else if (!ok)
                 EditorUtility.DisplayDialog("빌드 실패", $"{when} · 결과 {summary.result}, 오류 {summary.totalErrors}개.\nConsole 창의 빨간 줄을 확인하세요.", "닫기");
         }

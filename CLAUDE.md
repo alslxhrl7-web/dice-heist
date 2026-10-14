@@ -77,7 +77,7 @@ $u = "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe"
 # EditMode 테스트는 Core만 쓰므로, 에디터가 열려 있으면 .NET SDK로 Core + Tests/EditMode를 묶은 NUnit 프로젝트를 만들어 dotnet test로도 돌릴 수 있다
 & $u -batchmode -projectPath . -runTests -testPlatform EditMode -testResults "$env:TEMP\dh.xml" -logFile "$env:TEMP\dh.log"
 
-# Windows 빌드 → Builds/Windows/DiceHeist.exe
+# Windows 빌드 → Builds/Windows/DiceHeist.exe, 보낼 파일은 Builds/DiceHeist-Windows.zip(빌드할 때마다 덮어씀)
 & $u -batchmode -quit -projectPath . -executeMethod DiceHeist.EditorTools.DiceHeistSetup.BuildWindows -logFile "$env:TEMP\dh_build.log"
 ```
 
