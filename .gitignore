@@ -34,3 +34,13 @@ crashlytics-build.properties
 
 # 프로젝트 안에 따로 받아 둔 저장소 사본
 /dice-heist/
+
+# 멀티 서버 빌드 산출물과 개발용 DB
+Server/**/bin/
+Server/**/obj/
+*.db
+*.db-wal
+*.db-shm
+
+# 위의 *.csproj는 Unity가 만드는 프로젝트 파일용. 서버(.NET) 프로젝트 파일은 저장소에 넣는다
+!Server/**/*.csproj

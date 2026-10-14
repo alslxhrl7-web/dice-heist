@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>다이스 하이스트 멀티</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap">
+<style>
+:root{
+  --bg:#eaf0ea; --felt:#cfe3d6; --felt-edge:#9cc3ad; --card:#fbfcf9; --ink:#1f2a26; --muted:#5a6c64;
+  --line:rgba(31,42,38,.13); --die:#fffdf6; --pip:#26302c; --die-back:#7fae96;
+  --accent:#e2a425; --on-accent:#352503; --raise:#c4426a; --on-raise:#fff; --good:#2c8a57; --fold:#8b958f; --bad:#b3412e;
+  --display:"Jua","Gowun Dodum",system-ui,sans-serif; --body:"Gowun Dodum",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#121a17; --felt:#1d382e; --felt-edge:#2d5545; --card:#19241f; --ink:#ecf2ee; --muted:#9bb2a8;
+  --line:rgba(236,242,238,.13); --die:#f6f1e4; --pip:#222a26; --die-back:#3f7560;
+  --accent:#f0b94b; --on-accent:#2a1d03; --raise:#e0789a; --on-raise:#2a0912; --good:#5fc58d; --fold:#6e7974; --bad:#e2735f; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:820px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+.num{font-variant-numeric:tabular-nums}
+h1{font-family:var(--display);font-weight:400;font-size:1.9rem;margin:0;line-height:1.1}
+h2{font-family:var(--display);font-weight:400;font-size:1.15rem;margin:0 0 8px}
+.sub{color:var(--muted);font-size:.9rem;margin:2px 0 0}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:var(--card);border-radius:12px;padding:6px 12px;display:flex;flex-direction:column;min-width:80px}
+.stat b{font-family:var(--display);font-weight:400;font-size:1.15rem}
+.stat span{font-size:.75rem;color:var(--muted)}
+.panel{background:var(--card);border-radius:18px;padding:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input{font:inherit;padding:10px 14px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+.btn{font-family:var(--display);font-size:1.05rem;padding:10px 20px;border-radius:999px;border:0;background:var(--bg);color:var(--ink);box-shadow:0 3px 0 var(--line);cursor:pointer;line-height:1.25}
+.btn small{display:block;font-family:var(--body);font-size:.78rem;opacity:.85}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.raise{background:var(--raise);color:var(--on-raise)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible,button.die:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.error{color:var(--bad);min-height:1.5em;margin:0}
+.note{color:var(--muted);font-size:.88rem;margin:0}
+.rooms{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rooms li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--bg);flex-wrap:wrap}
+.pill{font-size:.78rem;padding:1px 9px;border-radius:999px;background:var(--line);white-space:nowrap}
+.pill.raise{background:var(--raise);color:var(--on-raise)}
+.pill.call{background:var(--good);color:var(--card)}
+.pill.fold{background:var(--fold);color:var(--card)}
+.pill.first{background:var(--accent);color:var(--on-accent)}
+.table{background:var(--felt);border:2px solid var(--felt-edge);border-radius:28px;padding:18px;display:flex;flex-direction:column;gap:16px}
+.opps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.opp,.me{background:var(--card);border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;border:3px solid transparent}
+.opp.turn,.me.turn{border-color:var(--accent)}
+.opp.out{opacity:.55}
+.opp.win,.me.win{border-color:var(--good)}
+.top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.top strong{font-family:var(--display);font-weight:400;font-size:1.15rem}
+.mini{display:flex;gap:5px}
+.die{background:var(--die);border-radius:14px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:11%;box-shadow:0 3px 0 rgba(0,0,0,.2);border:3px solid transparent;position:relative}
+.die.sm{width:26px;height:26px;border-radius:7px;border-width:0;padding:3px;box-shadow:0 2px 0 rgba(0,0,0,.2)}
+.die.back{background:var(--die-back)}
+.pip{width:72%;height:72%;border-radius:50%;place-self:center}
+.pip.on{background:var(--pip)}
+.dice{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding-bottom:18px}
+button.die{width:62px;height:62px;cursor:pointer;font:inherit;color:inherit;transition:transform .15s}
+button.die:disabled{cursor:default}
+button.die.held{border-color:var(--accent);transform:translateY(-6px)}
+button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);font-family:var(--display);font-size:.8rem;color:var(--on-accent);background:var(--accent);border-radius:999px;padding:0 8px}
+@media (max-width:420px){button.die{width:52px;height:52px}.dice{gap:8px}}
+.pot{display:flex;justify-content:center;align-items:baseline;gap:10px}
+.pot b{font-family:var(--display);font-weight:400;font-size:1.6rem}
+.pot span{color:var(--muted);font-size:.85rem}
+.timer{height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+.timer i{display:block;height:100%;background:var(--accent);width:0}
+.hand{text-align:center;font-family:var(--display);font-size:1.5rem;line-height:1.2}
+.hand small{display:block;font-family:var(--body);font-size:.85rem;color:var(--muted)}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.hint{text-align:center;color:var(--muted);font-size:.9rem;margin:0}
+.banner{text-align:center;font-family:var(--display);font-size:1.15rem;background:var(--card);border-radius:14px;padding:10px 14px}
+.banner.win{background:var(--good);color:var(--card)}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:.88rem;color:var(--muted)}
+.log li:first-child{color:var(--ink)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>다이스 하이스트</h1>
+      <p class="sub">멀티 · 사이버머니로 사람끼리 겨루기 · 최대 3명</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <!-- 로그인 -->
+  <section class="panel" id="auth" hidden>
+    <h2>로그인</h2>
+    <form class="row" id="authForm">
+      <input id="name" placeholder="아이디 (한글·영문·숫자 2~12자)" maxlength="12" autocomplete="username" required>
+      <input id="password" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" required>
+      <button class="btn primary" type="submit" data-mode="login">로그인</button>
+      <button class="btn" type="submit" data-mode="register">회원가입</button>
+    </form>
+    <p class="error" id="authError"></p>
+    <p class="note">아이디: 한글·영문·숫자·_ 를 섞어 2~12자 (예: 토끼, rabbit, 토끼Rabbit7). 띄어쓰기·특수문자는 안 됩니다. 비밀번호: 6자 이상.</p>
+    <p class="note">싱글(PC 게임)과 같은 계정을 씁니다. 싱글 브론즈에서 1,000칩을 달성하면 멀티가 열립니다.</p>
+  </section>
+
+  <!-- 로비 -->
+  <section id="lobby" hidden>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">로비</h2>
+        <div class="row">
+          <button class="btn" id="exchangeBtn"></button>
+          <button class="btn" id="grantBtn" hidden>테스트 머니 받기<small>개발용 · 브론즈 통과 처리</small></button>
+          <button class="btn" id="logoutBtn">로그아웃</button>
+        </div>
+      </div>
+      <p class="note" id="lobbyNote"></p>
+      <p class="error" id="lobbyError"></p>
+      <form class="row" id="createForm">
+        <input id="roomName" placeholder="방 이름" maxlength="20">
+        <button class="btn primary" type="submit">방 만들기</button>
+      </form>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>방 목록</h2>
+      <ul class="rooms" id="rooms"></ul>
+    </div>
+  </section>
+
+  <!-- 테이블 -->
+  <section id="game" hidden>
+    <div class="table">
+      <div class="row" style="justify-content:space-between">
+        <strong id="roomTitle" style="font-family:var(--display);font-weight:400;font-size:1.15rem"></strong>
+        <button class="btn" id="leaveBtn">나가기</button>
+      </div>
+      <div class="opps" id="opps"></div>
+      <div class="pot" id="pot"></div>
+      <div class="timer" aria-hidden="true"><i id="timerBar"></i></div>
+      <div id="banner" hidden></div>
+      <div class="me" id="me"></div>
+      <p class="error" id="gameError"></p>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>진행 기록</h2>
+      <ul class="log" id="log"></ul>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

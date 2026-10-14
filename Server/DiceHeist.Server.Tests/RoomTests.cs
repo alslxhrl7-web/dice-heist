@@ -1,0 +1,159 @@
+using System.Text.Json;
+using DiceHeist.Core;
+using DiceHeist.Server.Multi;
+using NUnit.Framework;
+
+namespace DiceHeist.Server.Tests
+{
+    /// <summary>방 하나의 진행을 가짜 시계로 확인한다(DB·네트워크 없음).</summary>
+    public class RoomTests
+    {
+        DateTimeOffset _now;
+        Room _room;
+        RoomSeat _a, _b;
+
+        static readonly MultiTimings T = new MultiTimings
+        {
+            Countdown = TimeSpan.FromSeconds(3), Hold = TimeSpan.FromSeconds(30), Bet = TimeSpan.FromSeconds(20), Result = TimeSpan.FromSeconds(6),
+        };
+
+        [SetUp]
+        public void SetUp()
+        {
+            _now = new DateTimeOffset(2026, 10, 14, 0, 0, 0, TimeSpan.Zero);
+            _room = new Room("1", "테스트", T, new SeededRandom(42));
+            _a = Seat(1, "가");
+            _b = Seat(2, "나");
+            _room.Sit(_a);
+            _room.Sit(_b);
+        }
+
+        static RoomSeat Seat(long id, string name) => new RoomSeat
+        {
+            UserId = id, Name = name, Stack = Room.BuyIn, SavedStack = Room.BuyIn, ConnectionId = "c" + id,
+        };
+
+        List<RoomSeat> Pass(TimeSpan t)
+        {
+            _now += t;
+            return _room.Tick(_now);
+        }
+
+        void StartRound()
+        {
+            Pass(TimeSpan.Zero);
+            Assert.AreEqual("countdown", _room.Phase);
+            Pass(T.Countdown);
+            Assert.AreEqual("hold", _room.Phase);
+        }
+
+        JsonElement State(RoomSeat viewer) =>
+            JsonDocument.Parse(JsonSerializer.Serialize(_room.StateFor(viewer, _now))).RootElement;
+
+        JsonElement SeatState(RoomSeat viewer, RoomSeat target) => State(viewer).GetProperty("seats")[_room.Seats.IndexOf(target)];
+
+        RoomSeat CurrentBettor() => _room.Seats.First(s => SeatState(s, s).GetProperty("turn").GetBoolean());
+
+        [Test]
+        public void 한_명이면_시작하지_않고_두_명이면_카운트다운_뒤에_시작한다()
+        {
+            var solo = new Room("2", "혼자", T, new SeededRandom(1));
+            solo.Sit(Seat(9, "혼자"));
+            solo.Tick(_now);
+            Assert.AreEqual("waiting", solo.Phase);
+
+            StartRound();
+            Assert.AreEqual(1, _room.RoundNo);
+            Assert.AreEqual(Room.BuyIn - _room.Ante, _a.Stack, "앤티가 빠진다");
+        }
+
+        [Test]
+        public void 남의_주사위는_쇼다운_전까지_보이지_않는다()
+        {
+            StartRound();
+            Assert.AreEqual(JsonValueKind.Array, SeatState(_a, _a).GetProperty("dice").ValueKind, "내 주사위는 보인다");
+            Assert.AreEqual(JsonValueKind.Null, SeatState(_a, _b).GetProperty("dice").ValueKind, "남의 주사위는 안 보인다");
+            Assert.AreEqual(JsonValueKind.Null, SeatState(_a, _b).GetProperty("hand").ValueKind);
+        }
+
+        [Test]
+        public void 모두_확정하고_콜하면_쇼다운까지_가고_칩_총량은_그대로()
+        {
+            StartRound();
+            Assert.IsNull(_room.Stand(_a, _now));
+            Assert.AreEqual("hold", _room.Phase, "한 명만 확정하면 기다린다");
+            Assert.IsNull(_room.Stand(_b, _now));
+            Assert.AreEqual("betting", _room.Phase);
+
+            var first = CurrentBettor();
+            var other = first == _a ? _b : _a;
+            Assert.IsNotNull(_room.Bet(other, "call", _now), "내 차례가 아니면 거절");
+            Assert.IsNull(_room.Bet(first, "call", _now));
+            Assert.IsNull(_room.Bet(other, "call", _now));
+            Assert.AreEqual("result", _room.Phase);
+            Assert.AreEqual(2 * Room.BuyIn, _a.Stack + _b.Stack);
+
+            // 쇼다운에서는 상대 주사위가 보인다
+            Assert.AreEqual(JsonValueKind.Array, SeatState(_a, _b).GetProperty("dice").ValueKind);
+
+            Pass(T.Result);
+            Assert.AreEqual("waiting", _room.Phase);
+        }
+
+        [Test]
+        public void 굴리기_시간이_지나면_모두_확정되고_베팅_시간이_지나면_폴드()
+        {
+            StartRound();
+            Pass(T.Hold);
+            Assert.AreEqual("betting", _room.Phase);
+            var first = CurrentBettor();
+            Pass(T.Bet);
+            Assert.AreEqual("result", _room.Phase, "두 명 중 한 명이 폴드하면 바로 끝난다");
+            Assert.IsTrue(_room.Seats.Single(s => s != first).Stack > Room.BuyIn, "남은 사람이 팟을 가져간다");
+        }
+
+        [Test]
+        public void 다시_굴리기는_두_번까지이고_다_쓰면_자동_확정()
+        {
+            StartRound();
+            var keep = new[] { true, true, false, false, false };
+            Assert.IsNull(_room.Reroll(_a, keep, _now));
+            Assert.IsNull(_room.Reroll(_a, keep, _now));
+            Assert.IsNotNull(_room.Reroll(_a, keep, _now));
+            Assert.IsTrue(SeatState(_a, _a).GetProperty("stood").GetBoolean());
+        }
+
+        [Test]
+        public void 판_중에_나가면_이번_판은_폴드하고_끝나면_일어난다()
+        {
+            StartRound();
+            Assert.IsFalse(_room.Leave(_a, _now), "판 중에는 바로 일어나지 않는다");
+            Assert.IsNull(_room.Stand(_b, _now));
+            Assert.AreEqual("result", _room.Phase, "나간 사람은 차례에 바로 폴드");
+            var removed = Pass(T.Result);
+            CollectionAssert.AreEqual(new[] { _a }, removed);
+            Assert.AreEqual(1, _room.Seats.Count);
+        }
+
+        [Test]
+        public void 대기_중에_나가면_바로_일어난다()
+        {
+            Assert.IsTrue(_room.Leave(_a, _now));
+            Assert.AreEqual(1, _room.Seats.Count);
+        }
+
+        [Test]
+        public void 선은_판마다_돈다()
+        {
+            StartRound();
+            string first = State(_a).GetProperty("seats").EnumerateArray().First(s => s.GetProperty("starter").GetBoolean()).GetProperty("name").GetString();
+            Pass(T.Hold);
+            Pass(T.Bet);
+            Pass(T.Result);
+            Pass(TimeSpan.Zero);
+            Pass(T.Countdown);
+            string second = State(_a).GetProperty("seats").EnumerateArray().First(s => s.GetProperty("starter").GetBoolean()).GetProperty("name").GetString();
+            Assert.AreNotEqual(first, second);
+        }
+    }
+}

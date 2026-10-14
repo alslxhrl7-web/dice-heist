@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "multi-server",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Server/DiceHeist.Server", "--launch-profile", "http"],
+      "port": 5080
+    }
+  ]
+}
