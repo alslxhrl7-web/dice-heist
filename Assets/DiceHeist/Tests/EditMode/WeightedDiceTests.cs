@@ -61,10 +61,12 @@ namespace DiceHeist.Tests
             const int n = 3000;
             var g = new DiceGame(TableConfig.Bronze, new SeededRandom(2026));
             int won = 0;
+            long net = 0;
             for (int round = 0; round < n; round++)
             {
                 g.RefillAi();
-                if (g.HumanIsBroke) g.Rescue();
+                g.Human.Chips = 500; // 한도에 막히지 않게 매 판 같은 칩으로
+                int before = g.Human.Chips;
                 g.StartRound();
                 foreach (var p in g.Players)
                 {
@@ -78,8 +80,11 @@ namespace DiceHeist.Tests
                 var bet = g.BeginBetting();
                 while (!bet.IsDone) bet.Apply(bet.Current.IsAi ? g.DecideAi(bet.Current) : BetAction.Call);
                 if (g.ResolveShowdown().Winners.Contains(g.Human)) won++;
+                net += g.Human.Chips - before;
             }
-            Assert.That(won / (double)n, Is.InRange(0.74, 0.86));
+            Assert.That(won / (double)n, Is.InRange(0.74, 0.86), "승률");
+            // AI가 쉽게 폴드하지 않아 팟이 커야 한다: 판당 평균 앤티 2배 이상
+            Assert.That(net / (double)n, Is.GreaterThan(20), "판당 평균 수익");
         }
 
         [Test]

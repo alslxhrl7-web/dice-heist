@@ -23,15 +23,21 @@ namespace DiceHeist.Core
         public int AiMaxRerolls = 2;
         /// <summary>AI의 배짱. 1보다 작으면 스트레이트 밑의 패로는 이 확률로만 판에 남고 나머지는 포기한다.</summary>
         public double AiNerve = 1.0;
+        /// <summary>
+        /// AI가 제 패를 거꾸로 읽는 확률. 잘못 읽으면 약한 패로 콜·레이즈해 팟을 키우고, 투페어 이상은 겁먹고 폴드한다.
+        /// 브론즈에서 AI가 너무 빨리 폴드해 팟이 작던 문제를 풀려고 넣었다.
+        /// </summary>
+        public double AiMisread;
 
         /// <summary>
-        /// 입문 테이블. 500칩으로 시작해 1,000칩까지 벌 수 있다. 주사위 확률은 모두 같고 상대 AI만 서툴다(다시 굴리기 1회, 쉽게 포기).
-        /// 사람이 AI와 같은 기준으로 남기고 따라가기만 해도 다섯 판에 네 판쯤(약 80%) 판돈을 딴다.
+        /// 입문 테이블. 500칩으로 시작해 1,000칩까지 벌 수 있고, 한도에 닿으면 멀티가 열린다.
+        /// 주사위 확률은 모두 같고 상대 AI만 서툴다: 다시 굴리기 1회, 90% 확률로 제 패를 거꾸로 읽는다.
+        /// 사람이 AI와 같은 기준으로 남기고 콜만 해도 다섯 판에 네 판쯤(약 80%) 이기고, 판당 평균 +30칩쯤 번다.
         /// </summary>
         public static TableConfig Bronze => new TableConfig
         {
             Name = "브론즈", MinChips = 0, ChipCap = 1000, Ante = 10, StartChips = 500,
-            AiMaxRerolls = 1, AiNerve = 0.07,
+            AiMaxRerolls = 1, AiMisread = 0.9,
         };
 
         /// <summary>700칩 이상 가지고 있어야 입장, 1,500칩까지. AI는 다시 굴리기 2회에 배짱은 절반.</summary>
@@ -177,6 +183,11 @@ namespace DiceHeist.Core
             bool scary = false;
             foreach (var q in _players) if (q != p && !q.Folded && q.Rerolls == 0) scary = true;
             var rank = HandEvaluator.Evaluate(p.Dice).Rank;
+            if (_cfg.AiMisread > 0 && _rng.NextDouble() < _cfg.AiMisread)
+            {
+                if (rank >= HandRank.TwoPair) return BetAction.Fold;
+                rank = HandRank.FiveDice - (int)rank;
+            }
             return AiBrain.Decide(rank, p.Ai, Betting.RaiseUsed, Betting.Responding, scary, _rng, _cfg.AiNerve);
         }
 
