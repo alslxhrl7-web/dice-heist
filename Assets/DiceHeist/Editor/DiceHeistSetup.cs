@@ -51,16 +51,72 @@ namespace DiceHeist.EditorTools
         {
             const string dir = "Assets/DiceHeist/Resources";
             string path = $"{dir}/{Fx.BaseMaterialName}.mat";
-            if (AssetDatabase.LoadAssetAtPath<Material>(path) != null) return;
-
             var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            var shader = tmp.GetComponent<Renderer>().sharedMaterial.shader;
+            var shader = tmp.GetComponent<Renderer>().sharedMaterial.shader; // 지금 렌더 파이프라인의 기본 셰이더(URP면 Lit)
             Object.DestroyImmediate(tmp);
+
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null)
+            {
+                // 파이프라인을 바꿨으면 셰이더만 새 파이프라인 것으로 바꾼다(그대로 두면 분홍색)
+                if (existing.shader != shader)
+                {
+                    existing.shader = shader;
+                    existing.color = Color.white;
+                    EditorUtility.SetDirty(existing);
+                    AssetDatabase.SaveAssets();
+                    Debug.Log($"[DiceHeist] 기준 머티리얼 셰이더 교체: {shader.name}");
+                }
+                return;
+            }
             Directory.CreateDirectory(dir);
             AssetDatabase.Refresh();
             AssetDatabase.CreateAsset(new Material(shader) { color = Color.white }, path);
             AssetDatabase.SaveAssets();
             Debug.Log("[DiceHeist] 기준 머티리얼 생성: " + path);
+        }
+
+        const string UrpDir = "Assets/DiceHeist/Settings";
+
+        /// <summary>
+        /// Built-In 렌더 파이프라인(지원 중단 예정)에서 URP로 옮긴다. URP 에셋과 렌더러를 만들어 그래픽·품질 설정에 걸고,
+        /// 기준 머티리얼 셰이더를 URP Lit으로 바꾼다. 여러 번 실행해도 된다.
+        /// </summary>
+        [MenuItem("DiceHeist/URP로 전환")]
+        public static void SetupUrp()
+        {
+            string rendererPath = $"{UrpDir}/DiceHeist_Renderer.asset";
+            string assetPath = $"{UrpDir}/DiceHeist_URP.asset";
+            Directory.CreateDirectory(UrpDir);
+            AssetDatabase.Refresh();
+
+            var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRendererData>(rendererPath);
+            if (renderer == null)
+            {
+                renderer = ScriptableObject.CreateInstance<UnityEngine.Rendering.Universal.UniversalRendererData>();
+                AssetDatabase.CreateAsset(renderer, rendererPath);
+            }
+            var urp = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset>(assetPath);
+            if (urp == null)
+            {
+                urp = UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset.Create(renderer);
+                urp.shadowDistance = 40f;
+                AssetDatabase.CreateAsset(urp, assetPath);
+            }
+            AssetDatabase.SaveAssets();
+
+            UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline = urp;
+            int current = QualitySettings.GetQualityLevel();
+            for (int i = 0; i < QualitySettings.names.Length; i++)
+            {
+                QualitySettings.SetQualityLevel(i, false);
+                QualitySettings.renderPipeline = urp;
+            }
+            QualitySettings.SetQualityLevel(current, false);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[DiceHeist] URP 적용: " + assetPath);
+
+            EnsureBaseMaterial();
         }
 
         /// <summary>
@@ -81,6 +137,7 @@ namespace DiceHeist.EditorTools
         public static void BuildWindows()
         {
             const string output = "Builds/Windows/DiceHeist.exe";
+            if (UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline == null) SetupUrp();
             EnsureBaseMaterial();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {

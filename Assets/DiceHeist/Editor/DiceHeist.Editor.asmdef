@@ -3,7 +3,9 @@
     "rootNamespace": "DiceHeist.EditorTools",
     "references": [
         "DiceHeist.Core",
-        "DiceHeist.Game"
+        "DiceHeist.Game",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime"
     ],
     "includePlatforms": [
         "Editor"
