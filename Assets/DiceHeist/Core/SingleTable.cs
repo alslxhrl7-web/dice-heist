@@ -75,6 +75,9 @@ namespace DiceHeist.Core
         public bool canReroll;
         public int callCost;
         public int raiseCost;
+        /// <summary>내 차례에 고를 수 있는 레이즈 크기(이번 판 누적, 참가비 제외). 올릴 수 없으면 0.</summary>
+        public int minRaise;
+        public int maxRaise;
         public bool canCall;
         public bool canRaise;
         public bool raiseUsed;
@@ -172,7 +175,8 @@ namespace DiceHeist.Core
             return View(null);
         }
 
-        public SingleView Bet(string action)
+        /// <param name="raiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기(참가비 × RaiseMultiplier).</param>
+        public SingleView Bet(string action, int raiseTo = 0)
         {
             if (_phase != "bet" || _g.Betting.Current != _g.Human) return View("지금은 내 차례가 아닙니다.");
             BetAction request;
@@ -183,7 +187,7 @@ namespace DiceHeist.Core
                 case "raise": request = BetAction.Raise; break;
                 default: return View("알 수 없는 베팅입니다.");
             }
-            Apply(request);
+            Apply(request, raiseTo > 0 ? raiseTo : _g.RaiseTotal);
             RunAi();
             return View(null);
         }
@@ -197,10 +201,10 @@ namespace DiceHeist.Core
             if (bet.IsDone) Showdown();
         }
 
-        void Apply(BetAction request)
+        void Apply(BetAction request, int raiseTo = 0)
         {
             var p = _g.Betting.Current;
-            var (act, paid) = _g.Betting.Apply(request);
+            var (act, paid) = _g.Betting.Apply(request, raiseTo > 0 ? raiseTo : _g.RaiseTotal);
             Add(new TableEvent { kind = "bet", seat = p.Index, action = act.ToString().ToLowerInvariant(), paid = paid });
         }
 
@@ -282,7 +286,9 @@ namespace DiceHeist.Core
                 callCost = myTurn ? bet.CallCost(me) : 0,
                 raiseCost = myTurn ? bet.RaiseCost(me) : 0,
                 canCall = myTurn && bet.CanCall(me),
-                canRaise = myTurn && bet.CanRaise(me),
+                canRaise = myTurn && bet.CanRaiseAny(me),
+                minRaise = myTurn && bet.CanRaiseAny(me) ? bet.MinRaiseFor(me) : 0,
+                maxRaise = myTurn && bet.CanRaiseAny(me) ? bet.MaxRaiseFor(me) : 0,
                 raiseUsed = bet != null && bet.RaiseUsed,
                 responding = bet != null && bet.Responding,
                 result = _phase == "result" ? _result : null,

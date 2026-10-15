@@ -115,7 +115,7 @@ namespace DiceHeist.Tests
                 if (shot.Add(key))
                 {
                     // 연출이 조금 진행된 뒤의 화면을 남긴다
-                    yield return new WaitForSeconds(phase == "result" ? 0.3f : 0.65f);
+                    yield return new WaitForSeconds(phase == "result" ? 0.3f : phase == "bet" ? 0.1f : 0.65f); // bet은 자동 선택(0.4초) 전에 버튼을 찍는다
                     yield return Capture(boot.Cam, boot.Hud.Canvas, key);
                 }
                 yield return null;

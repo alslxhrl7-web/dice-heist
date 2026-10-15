@@ -137,7 +137,7 @@ namespace DiceHeist.Game
             banner.gameObject.SetActive(false);
 
             // 아래 가운데: 내 족보, 안내, 버튼
-            var bottom = Panel(root, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(900, 215));
+            var bottom = Panel(root, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(940, 215));
             _hand = Label(bottom, "…", 44, TextAlignmentOptions.Top, Ink);
             Stretch(_hand.rectTransform, 10, 8, 10, 10);
             _handSub = Label(bottom, "지금 내 족보", 19, TextAlignmentOptions.Top, Muted);
@@ -225,7 +225,7 @@ namespace DiceHeist.Game
                 Color bg = spec.Style == ButtonStyle.Primary ? Accent : spec.Style == ButtonStyle.Raise ? Raise : new Color(0.88f, 0.92f, 0.89f);
                 img.color = bg;
                 var le = rect.gameObject.AddComponent<LayoutElement>();
-                le.preferredWidth = Mathf.Max(200, 60 + LongestLine(spec.Label) * 25);
+                le.preferredWidth = spec.Label.Length <= 2 ? 72 : Mathf.Max(190, 40 + LongestLine(spec.Label) * 22); // +/- 같은 한 글자 버튼은 작게
                 le.preferredHeight = 68;
                 var btn = rect.gameObject.AddComponent<Button>();
                 btn.targetGraphic = img;

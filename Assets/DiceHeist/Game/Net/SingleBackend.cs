@@ -34,7 +34,7 @@ namespace DiceHeist.Game
 
     [Serializable] public sealed class SitBody { public string table; }
     [Serializable] public sealed class RerollBody { public bool[] held; }
-    [Serializable] public sealed class BetBody { public string action; }
+    [Serializable] public sealed class BetBody { public string action; public int raiseTo; }
     [Serializable] public sealed class ExchangeBody { public int amount; }
     [Serializable] public sealed class CredentialsBody { public string name; public string password; }
 
@@ -235,7 +235,7 @@ namespace DiceHeist.Game
                     case "rescue": v = _table.Rescue(); break;
                     case "reroll": v = _table.Reroll(JsonUtility.FromJson<RerollBody>(bodyJson).held); break;
                     case "stand": v = _table.Stand(); break;
-                    case "bet": v = _table.Bet(JsonUtility.FromJson<BetBody>(bodyJson).action); break;
+                    case "bet": { var b = JsonUtility.FromJson<BetBody>(bodyJson); v = _table.Bet(b.action, b.raiseTo); break; }
                     default: v = new SingleView { error = "알 수 없는 요청: " + op }; break;
                 }
                 Chips = _table.Chips;

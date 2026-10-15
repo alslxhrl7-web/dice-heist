@@ -11,8 +11,11 @@ namespace DiceHeist.Core
         /// <summary>이 테이블에서 가질 수 있는 최대 칩. 넘게 따면 넘친 만큼은 받지 못한다.</summary>
         public int ChipCap = int.MaxValue;
         public int Ante = 10;
-        /// <summary>올리기 금액 = 참가비 × 이 값.</summary>
+        /// <summary>올리기 금액 = 참가비 × 이 값. AI가 올릴 때와 크기를 고르지 않았을 때 쓴다.</summary>
         public int RaiseMultiplier = 3;
+        /// <summary>사람이 고를 수 있는 레이즈 크기의 범위(참가비 배수). 레이즈는 이 범위에서 참가비 단위로 고른다.</summary>
+        public int MinRaiseMultiplier = 2;
+        public int MaxRaiseMultiplier = 10;
         public int MaxRerolls = 2;
         /// <summary>처음 시작하는 사람의 칩.</summary>
         public int StartChips = 1000;
@@ -30,13 +33,13 @@ namespace DiceHeist.Core
         public double AiMisread;
 
         /// <summary>
-        /// 입문 테이블. 500칩으로 시작해 1,000칩까지 벌 수 있다.
+        /// 입문 테이블. 사람도 AI도 500칩으로 시작하고, 사람은 1,000칩까지 벌 수 있다.
         /// 주사위 확률은 모두 같고 상대 AI만 서툴다: 다시 굴리기 1회, 65% 확률로 제 패를 거꾸로 읽는다.
         /// 사람이 AI와 같은 기준으로 남기고 콜만 해도 약 70% 이기고, 판당 평균 +21칩쯤 번다.
         /// </summary>
         public static TableConfig Bronze => new TableConfig
         {
-            Name = "브론즈", MinChips = 0, ChipCap = 1000, Ante = 10, StartChips = 500,
+            Name = "브론즈", MinChips = 0, ChipCap = 1000, Ante = 10, StartChips = 500, AiStartChips = 500,
             AiMaxRerolls = 1, AiMisread = 0.65,
         };
 
@@ -99,6 +102,9 @@ namespace DiceHeist.Core
         public PlayerState Human => _players[0];
         public int Ante => _cfg.Ante;
         public int RaiseTotal => _cfg.Ante * _cfg.RaiseMultiplier;
+        /// <summary>사람이 고를 수 있는 가장 작은·큰 레이즈 크기(참가비 제외, 이번 판 누적).</summary>
+        public int MinRaiseTotal => _cfg.Ante * _cfg.MinRaiseMultiplier;
+        public int MaxRaiseTotal => _cfg.Ante * _cfg.MaxRaiseMultiplier;
         public int MaxRerolls => _cfg.MaxRerolls;
         public int RescueChips => _cfg.RescueChips;
         public TableConfig Config => _cfg;
@@ -226,6 +232,11 @@ namespace DiceHeist.Core
                 if (rank >= HandRank.TwoPair) return BetAction.Fold;
                 rank = HandRank.FiveDice - (int)rank;
             }
+            // 기본보다 큰 레이즈에는 트리플 밑의 패로 그만큼 덜 따라간다.
+            // 기본 크기 레이즈면 난수를 더 쓰지 않으므로 예전과 같은 판이 그대로 나온다
+            if (Betting.RaiseUsed && Betting.Level > RaiseTotal && rank < HandRank.Triple
+                && _rng.NextDouble() < 1.0 - (double)RaiseTotal / Betting.Level)
+                return BetAction.Fold;
             return AiBrain.Decide(rank, p.Ai, Betting.RaiseUsed, Betting.Responding, scary, _rng, _cfg.AiNerve);
         }
 

@@ -19,7 +19,14 @@ namespace DiceHeist.Game
         {
             public Vector3[] Pos;
             public Quaternion[] Rot;
+            /// <summary>이 프레임에 일어난 충돌의 세기(0~1). 없으면 null. 재생할 때 소리를 낸다.</summary>
+            public List<float> Impacts;
         }
+
+        /// <summary>속도가 한 스텝에 이만큼 넘게 바뀌면 부딪힌 것으로 본다(중력만으로는 한 스텝 0.2).</summary>
+        const float ImpactThreshold = 1.1f;
+        /// <summary>한 주사위가 이보다 짧은 간격으로 또 부딪히면 소리를 내지 않는다(구를 때 다다닥 겹치지 않게).</summary>
+        const float ImpactGap = 0.06f;
 
         /// <param name="dice">굴릴 주사위</param>
         /// <param name="values">각 주사위에 나와야 하는 눈</param>
@@ -42,9 +49,14 @@ namespace DiceHeist.Game
 
             float t = 0f;
             int last = frames.Count - 1;
+            int played = -1;
             while (true)
             {
                 int f = Mathf.Min(last, Mathf.FloorToInt(t / Step));
+                for (int k = played + 1; k <= f; k++)
+                    if (frames[k].Impacts != null)
+                        foreach (float s in frames[k].Impacts) DiceAudio.Impact(s);
+                played = f;
                 for (int i = 0; i < dice.Count; i++)
                     dice[i].transform.SetPositionAndRotation(frames[f].Pos[i], frames[f].Rot[i]);
                 if (f == last) break;
@@ -72,16 +84,34 @@ namespace DiceHeist.Game
             }
 
             var frames = new List<Frame>(MaxSteps);
+            var prevVel = new Vector3[dice.Count];
+            var lastHit = new float[dice.Count];
+            for (int i = 0; i < dice.Count; i++)
+            {
+                prevVel[i] = dice[i].Body.linearVelocity;
+                lastHit[i] = -1f;
+            }
             for (int s = 0; s < MaxSteps; s++)
             {
                 Physics.Simulate(Step);
                 var fr = new Frame { Pos = new Vector3[dice.Count], Rot = new Quaternion[dice.Count] };
                 bool asleep = true;
+                float now = (s + 1) * Step;
                 for (int i = 0; i < dice.Count; i++)
                 {
                     fr.Pos[i] = dice[i].Body.position;
                     fr.Rot[i] = dice[i].Body.rotation;
                     if (!dice[i].Body.IsSleeping()) asleep = false;
+
+                    // 충돌 찾기: 속도가 갑자기 바뀐 순간
+                    Vector3 v = dice[i].Body.linearVelocity;
+                    float dv = (v - prevVel[i]).magnitude;
+                    prevVel[i] = v;
+                    if (dv > ImpactThreshold && now - lastHit[i] > ImpactGap)
+                    {
+                        lastHit[i] = now;
+                        (fr.Impacts ??= new List<float>()).Add(Mathf.Clamp01(dv / 6f));
+                    }
                 }
                 frames.Add(fr);
                 if (asleep && s > 10) break;

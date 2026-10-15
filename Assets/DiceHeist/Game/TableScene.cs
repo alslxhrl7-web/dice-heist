@@ -229,6 +229,7 @@ namespace DiceHeist.Game
             Vector3 hold = Vector3.Lerp(seat.CupRest, seat.Animal.HandPosition, 0.75f) + Vector3.up * 1.0f;
             yield return Fx.MoveTo(cup, hold, Quaternion.Euler(0, 0, 160f), 0.22f, 0.3f);
             StartCoroutine(seat.Animal.Throw());
+            DiceAudio.CupRattle(0.55f);
             for (float e = 0; e < 0.55f; e += Time.deltaTime)
             {
                 float s = Mathf.Sin(e * 42f);
@@ -236,6 +237,7 @@ namespace DiceHeist.Game
                 yield return null;
             }
             yield return Fx.MoveTo(cup, seat.CupRest, Quaternion.identity, 0.16f, 0.2f);
+            DiceAudio.CupSlam();
         }
 
         /// <summary>공개: 컵을 치우고 주사위 5개를 줄지어 보여준다.</summary>

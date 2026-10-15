@@ -60,7 +60,7 @@ namespace DiceHeist.Tests
         {
             var g = new DiceGame(TableConfig.Bronze, new SeededRandom(1));
             Assert.AreEqual(500, g.Human.Chips);
-            Assert.AreEqual(1000, g.Players[1].Chips);
+            Assert.AreEqual(500, g.Players[1].Chips, "AI도 500칩(2026-10-16 사용자 결정)");
         }
 
         [Test]

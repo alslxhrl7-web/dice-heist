@@ -31,6 +31,8 @@ namespace DiceHeist.Game
         readonly List<string> _logs = new List<string>();
         string _choice;
         int _turnSeat = -1;
+        /// <summary>내가 고른 레이즈 크기(이번 판 누적). 0이면 아직 안 골랐다.</summary>
+        int _raiseTo;
         bool _showHand;
         int _played, _won, _best = -1;
         bool _wired, _entered, _leave;
@@ -235,15 +237,29 @@ namespace DiceHeist.Game
                     _hud.SetHint($"누군가 레이즈(올리기)해서 {Times(_v.seats[0].contrib + _v.callCost)}가 됐습니다. 콜(따라가기)하려면 그만큼 내야 합니다.");
                 else
                 {
-                    _hud.SetHint($"배수는 앤티(참가비) {_v.ante}칩 기준. 레이즈(올리기)는 판당 한 명만, {Times(_v.raiseTotal)}까지.");
-                    buttons.Add(new ButtonSpec("raise", $"{Raise}\n<size=20>+{_v.raiseCost}칩 · {Times(_v.raiseTotal)}</size>", ButtonStyle.Raise, _v.canRaise));
+                    // 레이즈 크기는 -/+로 앤티 단위로 고른다. 처음엔 기본 크기
+                    if (_v.canRaise)
+                    {
+                        if (_raiseTo == 0) _raiseTo = _v.raiseTotal;
+                        _raiseTo = Mathf.Clamp(_raiseTo, _v.minRaise, _v.maxRaise);
+                    }
+                    int cost = _raiseTo - _v.seats[0].contrib;
+                    _hud.SetHint($"레이즈(올리기) 크기는 -/+로 고릅니다: {Times(_v.minRaise)}~{Times(_v.maxRaise)}, 앤티(참가비) {_v.ante}칩 단위. 판당 한 명만.");
+                    buttons.Add(new ButtonSpec("raise-", "−", ButtonStyle.Plain, _v.canRaise && _raiseTo > _v.minRaise));
+                    buttons.Add(new ButtonSpec("raise", _v.canRaise ? $"{Raise}\n<size=20>+{cost}칩 · {Times(_raiseTo)}</size>" : Raise, ButtonStyle.Raise, _v.canRaise));
+                    buttons.Add(new ButtonSpec("raise+", "+", ButtonStyle.Plain, _v.canRaise && _raiseTo < _v.maxRaise));
                 }
                 Refresh();
                 yield return Choose(buttons.ToArray());
+                if (_choice == "raise-" || _choice == "raise+")
+                {
+                    _raiseTo += _choice == "raise+" ? _v.ante : -_v.ante;
+                    continue; // 서버에 묻지 않고 버튼만 다시 그린다
+                }
                 string action = _choice == "raise" ? "raise" : _choice == "call" ? "call" : "fold";
 
                 before = Snapshot();
-                yield return Request("bet", JsonUtility.ToJson(new BetBody { action = action }));
+                yield return Request("bet", JsonUtility.ToJson(new BetBody { action = action, raiseTo = action == "raise" ? _raiseTo : 0 }));
                 if (!string.IsNullOrEmpty(_v.error)) { error[0] = _v.error; yield break; }
                 yield return PlayEvents(before);
             }

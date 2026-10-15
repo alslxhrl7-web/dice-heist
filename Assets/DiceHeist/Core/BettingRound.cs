@@ -37,17 +37,33 @@ namespace DiceHeist.Core
         }
 
         public int CallCost(PlayerState p) => Level - p.Contrib;
-        public int RaiseCost(PlayerState p) => _game.RaiseTotal - p.Contrib;
+        /// <summary>기본 크기(참가비 × RaiseMultiplier)로 올릴 때 낼 금액.</summary>
+        public int RaiseCost(PlayerState p) => RaiseCostTo(p, _game.RaiseTotal);
+        /// <summary>이번 판 누적이 total이 되도록 올릴 때 낼 금액.</summary>
+        public int RaiseCostTo(PlayerState p, int total) => total - p.Contrib;
         public bool CanCall(PlayerState p) => p.Chips >= CallCost(p);
+        /// <summary>기본 크기로 올릴 수 있는지.</summary>
         public bool CanRaise(PlayerState p) => !RaiseUsed && !_responsePass && p.Chips >= RaiseCost(p);
+        /// <summary>p가 고를 수 있는 레이즈 크기의 범위(이번 판 누적). 올릴 수 없으면 max가 min보다 작다.</summary>
+        public int MinRaiseFor(PlayerState p) => Math.Max(_game.MinRaiseTotal, Level + _game.Ante);
+        public int MaxRaiseFor(PlayerState p) => Math.Min(_game.MaxRaiseTotal, p.Chips + p.Contrib);
+        /// <summary>어떤 크기로든 올릴 수 있는지.</summary>
+        public bool CanRaiseAny(PlayerState p) => !RaiseUsed && !_responsePass && MaxRaiseFor(p) >= MinRaiseFor(p);
 
-        /// <summary>현재 차례의 선택을 적용한다. 칩이 모자라면 올리기→따라가기→포기로 낮춰지고, 실제 적용된 행동과 낸 금액을 돌려준다.</summary>
-        public (BetAction action, int paid) Apply(BetAction requested)
+        /// <summary>현재 차례의 선택을 적용한다. 올리기는 기본 크기. 칩이 모자라면 올리기→따라가기→포기로 낮춰진다.</summary>
+        public (BetAction action, int paid) Apply(BetAction requested) => Apply(requested, _game.RaiseTotal);
+
+        /// <summary>
+        /// 현재 차례의 선택을 적용한다. 올리기면 이번 판 누적이 raiseTo가 되게 올린다(허용 범위로 맞춤).
+        /// 칩이 모자라면 올리기→따라가기→포기로 낮춰지고, 실제 적용된 행동과 낸 금액을 돌려준다.
+        /// </summary>
+        public (BetAction action, int paid) Apply(BetAction requested, int raiseTo)
         {
             var p = Current ?? throw new InvalidOperationException("걸기 단계가 이미 끝났습니다.");
             var act = requested;
+            raiseTo = Math.Max(MinRaiseFor(p), Math.Min(_game.MaxRaiseTotal, raiseTo));
             if (act == BetAction.Raise && (RaiseUsed || _responsePass)) act = BetAction.Call;
-            if (act == BetAction.Raise && p.Chips < RaiseCost(p)) act = BetAction.Call;
+            if (act == BetAction.Raise && p.Chips < RaiseCostTo(p, raiseTo)) act = BetAction.Call;
             if (act == BetAction.Call && p.Chips < CallCost(p)) act = BetAction.Fold;
 
             int paid = 0;
@@ -63,10 +79,10 @@ namespace DiceHeist.Core
                     p.Status = SeatStatus.Called;
                     break;
                 case BetAction.Raise:
-                    paid = RaiseCost(p);
+                    paid = RaiseCostTo(p, raiseTo);
                     _game.Pay(p, paid);
                     p.Status = SeatStatus.Raised;
-                    Level = _game.RaiseTotal;
+                    Level = raiseTo;
                     Raiser = p;
                     break;
             }
