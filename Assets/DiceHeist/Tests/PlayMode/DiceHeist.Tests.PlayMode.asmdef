@@ -5,7 +5,9 @@
         "DiceHeist.Core",
         "DiceHeist.Game",
         "UnityEngine.TestRunner",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

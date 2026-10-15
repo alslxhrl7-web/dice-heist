@@ -74,6 +74,10 @@ namespace DiceHeist.Game
             Button(card, "Btn_offline", "서버 없이 연습 (칩은 이 PC에만 저장)", Plain, new Vector2(0, 44), new Vector2(460, 56), 20, () => OfflineChosen?.Invoke());
             Label(card, "서버: " + serverUrl, 15, Muted, 10, 24);
 
+            // Tab은 칸 이동에만 쓴다(글자로 들어가지 않게)
+            TMP_InputField.OnValidateInput noTab = (text, index, ch) => ch == '\t' ? '\0' : ch;
+            _name.onValidateInput = noTab;
+            _password.onValidateInput = noTab;
             _name.onSubmit.AddListener(_ => _password.ActivateInputField());
             _password.onSubmit.AddListener(_ => Submit(false));
             _name.ActivateInputField();
@@ -101,6 +105,33 @@ namespace DiceHeist.Game
         }
 
         public void Close() => Destroy(gameObject);
+
+        void Update()
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb == null || !kb.tabKey.wasPressedThisFrame) return;
+            MoveFocus(kb.shiftKey.isPressed);
+        }
+
+        /// <summary>
+        /// Tab: 아이디 → 비밀번호 → 아이디. Shift+Tab은 거꾸로. 둘 다 아니면(버튼을 눌러 포커스가 빠졌을 때) 아이디로.
+        /// TMP 입력 칸은 Tab을 스스로 옮겨 주지 않아 직접 처리한다.
+        /// </summary>
+        public void MoveFocus(bool backward)
+        {
+            var next = _name.isFocused ? _password
+                : _password.isFocused ? _name
+                : backward ? _password : _name;
+            var current = next == _name ? _password : _name;
+            current.DeactivateInputField();
+            next.Select();
+            next.ActivateInputField();
+            // 들어가자마자 기존 글자 끝으로 커서를 둔다(전체 선택돼 실수로 지우지 않게)
+            next.caretPosition = next.text.Length;
+        }
+
+        /// <summary>테스트용: 지금 입력 중인 칸이 아이디(0)·비밀번호(1)·없음(-1).</summary>
+        public int FocusedField => _name.isFocused ? 0 : _password.isFocused ? 1 : -1;
 
         // ---------- 조립 도우미 ----------
 
