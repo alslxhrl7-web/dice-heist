@@ -106,5 +106,51 @@ namespace DiceHeist.Core
             for (int i = 0; i < mask.Length; i++) mask[i] = all || c[dice[i]] >= 2;
             return mask;
         }
+
+        /// <summary>
+        /// winner가 loser를 이긴 이유 한 줄. 결과 화면에 그대로 보여 준다.
+        /// 족보가 다르면 족보끼리, 같으면 처음으로 갈린 눈을 Compare와 같은 순서로 설명한다. 완전 동점이면 "완전 동점".
+        /// </summary>
+        public static string Explain(HandValue winner, HandValue loser)
+        {
+            if (winner.Rank != loser.Rank)
+                return $"{WithSubject(NameOf(winner.Rank))} {NameOf(loser.Rank)}보다 높은 족보";
+
+            string same = $"같은 {NameOf(winner.Rank)}";
+            int n = Math.Max(winner.Tiebreak.Length, loser.Tiebreak.Length);
+            for (int i = 0; i < n; i++)
+            {
+                int x = i < winner.Tiebreak.Length ? winner.Tiebreak[i] : 0;
+                int y = i < loser.Tiebreak.Length ? loser.Tiebreak[i] : 0;
+                if (x == y) continue;
+                if (winner.Rank == HandRank.Straight)
+                    return $"{same} · 2-6이 1-5보다 높음";
+                return $"{same} · {PartName(winner.Rank, i)} {x} > {y}";
+            }
+            return $"{same} · 완전 동점";
+        }
+
+        /// <summary>받침이 있으면 "이", 없으면 "가"를 붙인다(트리플이, 투페어가).</summary>
+        static string WithSubject(string word)
+        {
+            char last = word[word.Length - 1];
+            bool batchim = last >= '가' && last <= '힣' && (last - '가') % 28 != 0;
+            return word + (batchim ? "이" : "가");
+        }
+
+        /// <summary>Tiebreak의 i번째 자리가 무엇인지(족보마다 묶음 → 남은 주사위 순).</summary>
+        static string PartName(HandRank rank, int i)
+        {
+            switch (rank)
+            {
+                case HandRank.FiveDice: return "눈";
+                case HandRank.FourDice: return i == 0 ? "포 다이스 눈" : "남은 주사위";
+                case HandRank.FullHouse: return i == 0 ? "트리플 눈" : "페어 눈";
+                case HandRank.Triple: return i == 0 ? "트리플 눈" : "남은 주사위";
+                case HandRank.TwoPair: return i == 0 ? "큰 페어" : i == 1 ? "작은 페어" : "남은 주사위";
+                case HandRank.OnePair: return i == 0 ? "페어 눈" : "남은 주사위";
+                default: return i == 0 ? "가장 높은 눈" : "다음 높은 눈";
+            }
+        }
     }
 }

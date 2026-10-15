@@ -130,7 +130,7 @@ namespace DiceHeist.Game
             Stretch(rankOdds.rectTransform, 18, 52, 18, 10);
 
             // 가운데 위: 결과 배너
-            var banner = Panel(root, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(820, 70));
+            var banner = Panel(root, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -8), new Vector2(860, 92)); // 두 줄: 결과 + 이긴 이유
             _bannerBg = banner.GetComponent<Image>();
             _bannerText = Label(banner, "", 30, TextAlignmentOptions.Center, Ink);
             Stretch(_bannerText.rectTransform, 10, 4, 10, 4);

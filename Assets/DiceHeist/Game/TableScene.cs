@@ -241,11 +241,23 @@ namespace DiceHeist.Game
         }
 
         /// <summary>공개: 컵을 치우고 주사위 5개를 줄지어 보여준다.</summary>
-        public IEnumerator Reveal(int seatIndex, int[] values)
+        /// <param name="slow">마지막 공개처럼 뜸을 들일 때: 컵을 살짝 들었다 멈췄다가 연다.</param>
+        public IEnumerator Reveal(int seatIndex, int[] values, bool slow = false)
         {
             var seat = Seats[seatIndex];
             Vector3 back = (seat.Animal.Seat - seat.CupRest);
             back.y = 0;
+            if (slow)
+            {
+                // 살짝 들어 틈만 보여 주고 흔들며 뜸을 들인다
+                yield return Fx.MoveTo(seat.Cup, seat.CupRest + Vector3.up * 0.18f, Quaternion.identity, 0.35f);
+                for (float e = 0; e < 0.6f; e += Time.deltaTime)
+                {
+                    seat.Cup.rotation = Quaternion.Euler(Mathf.Sin(e * 30f) * 3f, 0, Mathf.Cos(e * 26f) * 3f);
+                    yield return null;
+                }
+            }
+            DiceAudio.Tock(slow ? 0.85f : 1f);
             StartCoroutine(Fx.MoveTo(seat.Cup, seat.CupRest + back.normalized * 1.25f + Vector3.up * 0.02f, Quaternion.Euler(0, 0, 0), 0.35f, 1.2f));
 
             var routines = new IEnumerator[5];
@@ -261,6 +273,65 @@ namespace DiceHeist.Game
                     Fx.ScaleTo(d.transform, Vector3.one, 0.3f));
             }
             yield return Fx.All(this, routines);
+        }
+
+        /// <summary>족보를 이루는 주사위를 두 번 통통 튀게 해 눈에 띄게 한다.</summary>
+        public IEnumerator Highlight(int seatIndex, bool[] mask)
+        {
+            var dice = Seats[seatIndex].Dice;
+            var basePos = new Vector3[dice.Length];
+            for (int i = 0; i < dice.Length; i++) basePos[i] = dice[i].transform.position;
+            for (int hop = 0; hop < 2; hop++)
+            {
+                for (float e = 0; e < 0.28f; e += Time.deltaTime)
+                {
+                    float h = Mathf.Sin(e / 0.28f * Mathf.PI);
+                    for (int i = 0; i < dice.Length; i++)
+                    {
+                        if (!mask[i] || !dice[i].gameObject.activeSelf) continue;
+                        dice[i].transform.position = basePos[i] + Vector3.up * (h * 0.35f);
+                        dice[i].transform.localScale = Vector3.one * (1f + h * 0.18f);
+                    }
+                    yield return null;
+                }
+            }
+            for (int i = 0; i < dice.Length; i++)
+            {
+                if (!dice[i].gameObject.activeSelf) continue;
+                dice[i].transform.position = basePos[i];
+                dice[i].transform.localScale = Vector3.one;
+            }
+            Physics.SyncTransforms();
+        }
+
+        /// <summary>가운데 칩 더미가 이긴 사람(들) 쪽으로 날아가 사라진다. 짤그랑 소리와 함께.</summary>
+        public IEnumerator PotTo(int[] seats)
+        {
+            if (seats == null || seats.Length == 0 || _potPile.childCount == 0) yield break;
+            var chips = new Transform[_potPile.childCount];
+            for (int i = 0; i < chips.Length; i++) chips[i] = _potPile.GetChild(i);
+            // 칩 더미에서 먼저 떼어 낸다. 날아가는 도중에 SetPot이 더미를 다시 만들어도 날아가는 칩은 지워지지 않는다
+            foreach (var c in chips) c.SetParent(transform, true);
+            _potShown = 0;
+            var routines = new IEnumerator[chips.Length];
+            for (int i = 0; i < chips.Length; i++)
+            {
+                var target = Seats[seats[i % seats.Length]].Animal.Seat + Vector3.up * 1.1f;
+                routines[i] = FlyChip(chips[i], target, i * 0.025f);
+            }
+            DiceAudio.Chips(Mathf.Min(8, chips.Length), 0.8f);
+            yield return Fx.All(this, routines);
+        }
+
+        IEnumerator FlyChip(Transform chip, Vector3 target, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            if (chip == null) yield break;
+            yield return Fx.All(this,
+                Fx.MoveTo(chip, target, chip.rotation, 0.45f, 1.4f),
+                Fx.ScaleTo(chip, chip.localScale * 0.4f, 0.45f));
+            chip.gameObject.SetActive(false);
+            Destroy(chip.gameObject);
         }
 
         /// <summary>판돈만큼 가운데에 칩을 쌓는다.</summary>

@@ -285,24 +285,67 @@ namespace DiceHeist.Game
             {
                 var w = _v.seats[res.winners[0]];
                 Log($"{w.name} · {Pot} {res.pot}칩 획득 (쇼다운 없이)");
+                SyncShown();
+                _shownPot = res.pot; // 칩이 날아갈 때까지 가운데에 남겨 둔다
+                Refresh();
+                yield return _scene.PotTo(res.winners);
+                _shownPot = 0;
                 _hud.ShowBanner($"{w.name} 승리 · 나머지가 모두 폴드(포기) · +{res.pot}칩", iWon);
             }
             else
             {
-                var reveals = new List<IEnumerator>();
-                for (int i = 1; i < _v.seats.Length; i++)
-                    if (_v.seats[i].revealed && Has(_v.seats[i].dice)) reveals.Add(_scene.Reveal(i, _v.seats[i].dice));
+                // 한 명씩 연다. 화면의 족보 이름도 열린 사람부터 보이게, 일단 AI 공개 표시를 끈다
                 Phase = "reveal";
                 SyncShown();
+                _shownPot = res.pot;
+                var order = new List<int>();
+                for (int i = 1; i < _v.seats.Length; i++)
+                    if (_v.seats[i].revealed && Has(_v.seats[i].dice))
+                    {
+                        order.Add(i);
+                        _shown[i].revealed = false;
+                    }
                 Refresh();
-                yield return Fx.All(this, reveals.ToArray());
-                yield return new WaitForSeconds(0.45f);
+                for (int k = 0; k < order.Count; k++)
+                {
+                    int i = order[k];
+                    bool last = k == order.Count - 1;
+                    if (last)
+                    {
+                        // 마지막 컵 앞에서 점점 빨라지는 틱으로 뜸을 들인다
+                        _hud.SetHint($"{_v.seats[i].name}의 컵을 엽니다…");
+                        foreach (float gap in new[] { 0.32f, 0.24f, 0.17f, 0.12f, 0.08f })
+                        {
+                            DiceAudio.Tick();
+                            yield return new WaitForSeconds(gap);
+                        }
+                    }
+                    yield return _scene.Reveal(i, _v.seats[i].dice, last);
+                    _shown[i].revealed = true;
+                    Refresh();
+                    yield return new WaitForSeconds(last ? 0.3f : 0.45f);
+                }
+                _hud.SetHint("");
 
-                _hud.ShowBanner(res.winners.Length > 1
+                // 이긴 족보를 이루는 주사위를 통통 튀게
+                var hops = res.winners.Where(w => Has(_v.seats[w].dice))
+                    .Select(w => _scene.Highlight(w, HandEvaluator.PartMask(_v.seats[w].dice))).ToArray();
+                yield return Fx.All(this, hops);
+
+                string reason = WinReason(res);
+                _hud.ShowBanner((res.winners.Length > 1
                     ? $"무승부 · {Names(res.winners)} · {res.bestHand} · {res.share}칩씩 나눔"
-                    : $"{_v.seats[res.winners[0]].name} 승리 · {res.bestHand} · +{res.pot}칩", iWon);
+                    : $"{_v.seats[res.winners[0]].name} 승리 · {res.bestHand} · +{res.pot}칩")
+                    + (string.IsNullOrEmpty(reason) ? "" : $"\n<size=22>{reason}</size>"), iWon);
                 Log("쇼다운 · " + string.Join(" / ", res.handSeats.Select((s, k) => $"{_v.seats[s].name} {res.handNames[k]}")));
+                if (!string.IsNullOrEmpty(reason)) Log(reason);
+
+                yield return _scene.PotTo(res.winners);
+                _shownPot = 0;
             }
+
+            if (iWon) DiceAudio.Win();
+            else if (!_v.seats[me].folded) DiceAudio.Lose();
 
             for (int i = 0; i < _v.seats.Length; i++)
             {
@@ -327,6 +370,23 @@ namespace DiceHeist.Game
             Refresh();
             yield return Choose(new ButtonSpec("next", "다음 판", ButtonStyle.Primary), new ButtonSpec("tables", "테이블 선택"));
             if (_choice == "tables") _leave = true;
+        }
+
+        /// <summary>
+        /// 이긴 이유 한 줄: 승자와, 승자와 동점이 아닌 사람 중 가장 강한 사람(2등)을 비교한다.
+        /// 무승부면 동점인 두 사람을 비교해 "완전 동점"이 나온다.
+        /// </summary>
+        string WinReason(ResultView res)
+        {
+            if (res.handSeats == null || res.handSeats.Length < 2) return null;
+            int w = res.winners[0];
+            if (!Has(_v.seats[w].dice)) return null;
+            var win = HandEvaluator.Evaluate(_v.seats[w].dice);
+            int other = res.winners.Length > 1
+                ? res.winners[1]
+                : res.handSeats.Where(s => !res.winners.Contains(s) && Has(_v.seats[s].dice)).DefaultIfEmpty(-1).First();
+            if (other < 0 || !Has(_v.seats[other].dice)) return null;
+            return HandEvaluator.Explain(win, HandEvaluator.Evaluate(_v.seats[other].dice));
         }
 
         // ---------- 이벤트 재생 ----------
@@ -388,13 +448,16 @@ namespace DiceHeist.Game
                                 s.folded = true;
                                 Log($"{s.name} · {Fold}");
                                 animal.SetDroop(true);
+                                DiceAudio.Fold();
                                 break;
                             case "call":
                                 s.status = "called";
                                 Log($"{s.name} · {Call} +{e.paid} · {Times(s.contrib)}");
+                                DiceAudio.Chips(e.paid / Math.Max(1, _v.ante));
                                 break;
                             case "raise":
                                 s.status = "raised";
+                                DiceAudio.Chips(e.paid / Math.Max(1, _v.ante), 0.9f);
                                 Log($"{s.name} · {Raise} +{e.paid} · {Times(s.contrib)}");
                                 StartCoroutine(animal.Bounce());
                                 break;
