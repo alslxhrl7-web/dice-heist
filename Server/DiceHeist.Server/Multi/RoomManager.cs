@@ -122,6 +122,8 @@ namespace DiceHeist.Server.Multi
         public string Reroll(long userId, bool[] held) => Act(userId, (room, seat, now) => room.Reroll(seat, held, now));
         public string Stand(long userId) => Act(userId, (room, seat, now) => room.Stand(seat, now));
         public string Bet(long userId, string action, int raiseTo = 0) => Act(userId, (room, seat, now) => room.Bet(seat, action, now, raiseTo));
+        public string SitOut(long userId) => Act(userId, (room, seat, now) => room.SitOut(seat));
+        public string Back(long userId) => Act(userId, (room, seat, now) => room.Back(seat));
 
         string Act(long userId, Func<Room, RoomSeat, DateTimeOffset, string> action)
         {

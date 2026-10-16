@@ -104,6 +104,72 @@ namespace DiceHeist.Server.Tests
             Assert.AreEqual(before - _room.Ante * 10, first.Stack, "최대 10배");
         }
 
+        /// <summary>한 판을 아무 조작 없이 시간 초과로만 넘긴다. actor가 있으면 그 사람만 확정·콜한다.</summary>
+        void IdleRound(RoomSeat actor = null)
+        {
+            StartRound();
+            if (actor != null) _room.Stand(actor, _now);
+            Pass(T.Hold);
+            while (_room.Phase == "betting")
+            {
+                var cur = CurrentBettor();
+                if (cur == actor) _room.Bet(cur, "call", _now);
+                else Pass(T.Bet);
+            }
+            Assert.AreEqual("result", _room.Phase);
+            Pass(T.Result);
+        }
+
+        [Test]
+        public void 두_판_연달아_아무것도_안_하면_자리_비움이_되어_앤티를_내지_않는다()
+        {
+            IdleRound(actor: _a);
+            Assert.IsFalse(_b.Away, "한 판은 봐준다");
+            IdleRound(actor: _a);
+            Assert.IsTrue(_b.Away);
+            Assert.IsFalse(_a.Away, "움직인 사람은 그대로");
+            Assert.AreEqual(JsonValueKind.True, SeatState(_a, _b).GetProperty("away").ValueKind);
+
+            int stack = _b.Stack;
+            Pass(TimeSpan.Zero);
+            Pass(T.Countdown);
+            Assert.AreEqual("waiting", _room.Phase, "남은 한 명으로는 시작하지 않는다");
+            Assert.AreEqual(stack, _b.Stack, "자리 비움 중에는 앤티가 나가지 않는다");
+
+            Assert.IsNull(_room.Back(_b));
+            StartRound();
+            Assert.IsTrue(_room.InHand(_b), "돌아오면 다시 낀다");
+        }
+
+        [Test]
+        public void 한_번이라도_움직이면_빈_판_수가_처음부터_다시_센다()
+        {
+            IdleRound(actor: _a);
+            StartRound();
+            _room.Stand(_b, _now);
+            _room.Stand(_a, _now);
+            while (_room.Phase == "betting") _room.Bet(CurrentBettor(), "call", _now);
+            Pass(T.Result);
+            IdleRound(actor: _a);
+            Assert.IsFalse(_b.Away);
+        }
+
+        [Test]
+        public void 잠깐_쉬기를_누르면_지금_판은_끝까지_하고_다음_판부터_빠진다()
+        {
+            StartRound();
+            Assert.IsNull(_room.SitOut(_a));
+            Assert.IsTrue(_room.InHand(_a), "지금 판은 그대로");
+            Assert.IsNotNull(_room.SitOut(_a), "두 번은 안 된다");
+            _room.Stand(_a, _now); _room.Stand(_b, _now);
+            while (_room.Phase == "betting") _room.Bet(CurrentBettor(), "call", _now);
+            Pass(T.Result);
+            Pass(TimeSpan.Zero); Pass(T.Countdown);
+            Assert.AreEqual("waiting", _room.Phase);
+            Assert.IsTrue(_a.Away, "움직였어도 스스로 쉰 것은 그대로");
+            Assert.IsNotNull(_room.Back(_b), "쉬지 않는 사람은 돌아올 것이 없다");
+        }
+
         [Test]
         public void 남의_주사위는_쇼다운_전까지_보이지_않는다()
         {

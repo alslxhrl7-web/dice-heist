@@ -141,6 +141,8 @@ namespace DiceHeist.Server.Multi
         public string Bet(string action) => _rooms.Bet(UserId, action);
         /// <summary>이번 판 누적이 total이 되게 올린다. Bet("raise")는 기본 크기. 따로 둔 이유: 허브 메서드는 인자 수가 맞아야 해서, 예전 화면이 부르는 Bet(action)을 그대로 둔다</summary>
         public string RaiseTo(int total) => _rooms.Bet(UserId, "raise", total);
+        public string SitOut() => _rooms.SitOut(UserId);
+        public string Back() => _rooms.Back(UserId);
     }
 
     /// <summary>시간 제한(굴리기 30초, 베팅 20초 등)을 넘긴 방을 진행시킨다.</summary>

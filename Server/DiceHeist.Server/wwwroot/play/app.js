@@ -194,13 +194,15 @@ $('grantBtn').addEventListener('click', async () => {
 // ---------- 테이블 ----------
 
 $('leaveBtn').addEventListener('click', () => invoke('LeaveRoom'));
+$('awayBtn').addEventListener('click', () => invoke(state?.seats[state.mySeat]?.away ? 'Back' : 'SitOut'));
 $('me').addEventListener('click', e => {
   const d = e.target.closest('[data-die]');
   if (d && !d.disabled) { const i = +d.dataset.die; held[i] = !held[i]; render(); return; }
   const b = e.target.closest('[data-act]');
   if (!b || b.disabled) return;
   const act = b.dataset.act;
-  if (act === 'reroll') invoke('Reroll', held);
+  if (act === 'back') invoke('Back');
+  else if (act === 'reroll') invoke('Reroll', held);
   else if (act === 'stand') invoke('Stand');
   else if (act === 'raise-' || act === 'raise+') { raiseTo += (act === 'raise+' ? 1 : -1) * state.room.ante; render(); }
   else if (act === 'raise') invoke('RaiseTo', raiseTo);
@@ -233,6 +235,7 @@ function statusPill(s) {
   if (s.folded) return '<span class="pill fold">폴드 (포기)</span>';
   if (s.status === 'raised') return `<span class="pill raise">레이즈 (올리기) ${esc(s.times)}</span>`;
   if (s.status === 'called') return `<span class="pill call">콜 (따라가기) ${esc(s.times)}</span>`;
+  if (s.away && !s.inHand) return '<span class="pill">자리 비움</span>';
   if (!s.inHand) return '<span class="pill">다음 판부터</span>';
   if (s.stood) return '<span class="pill">확정</span>';
   return '<span class="pill">대기</span>';
@@ -300,6 +303,7 @@ function renderRanking() {
 function renderGame() {
   const s = state, mine = s.seats[s.mySeat], me = s.me;
   $('roomTitle').textContent = `${s.room.name} · 앤티 ${fmt(s.room.ante)} · ${s.roundNo ? s.roundNo + '판' : '시작 전'}`;
+  $('awayBtn').textContent = mine?.away ? '다시 참여' : '잠깐 쉬기';
 
   $('opps').innerHTML = s.seats.map((p, i) => i === s.mySeat ? '' : `
     <div class="opp ${p.turn ? 'turn' : ''} ${p.folded || !p.connected ? 'out' : ''} ${p.winner ? 'win' : ''}">
@@ -321,7 +325,11 @@ function renderGame() {
 
   let controls = '', hint = '';
   const holding = s.phase === 'hold' && me && me.canReroll;
-  if (s.phase === 'waiting') hint = '2명 이상 모이면 시작합니다.';
+  if (mine?.away && !me) {
+    hint = '자리 비움 중입니다. 판에 끼지 않아 참가비(앤티)가 나가지 않아요.';
+    controls = '<button class="btn primary" data-act="back">돌아왔어요</button>';
+  }
+  else if (s.phase === 'waiting') hint = '2명 이상 모이면 시작합니다.' + (s.seats.some(p => p.away) ? ' 자리 비운 사람은 세지 않습니다.' : '');
   else if (s.phase === 'countdown') hint = '곧 시작합니다…';
   else if (!me) hint = '이번 판이 끝나면 함께합니다.';
   else if (s.phase === 'hold') {
@@ -353,6 +361,7 @@ function renderGame() {
     }
   } else if (s.phase === 'result') hint = '곧 다음 판이 시작됩니다.';
 
+  if (mine?.away && me) hint = (hint ? hint + ' ' : '') + '(이번 판이 끝나면 쉽니다)';
   const dice = mine?.dice;
   const meEl = $('me');
   meEl.className = 'me' + ((holding || me?.myTurn) ? ' turn' : '') + (mine?.winner ? ' win' : '');

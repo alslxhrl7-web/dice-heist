@@ -23,6 +23,10 @@ namespace DiceHeist.Server.Multi
         public bool Leaving;
         /// <summary>이번 판 DiceGame에서의 자리 번호. 판에 안 끼었으면 -1.</summary>
         public int GameIndex = -1;
+        /// <summary>자리 비움: 앉아 있지만 판에 끼지 않는다(앤티도 안 낸다). 스스로 쉬거나, 판에 껴서 아무것도 안 하고 넘긴 판이 쌓이면 켜진다.</summary>
+        public bool Away;
+        /// <summary>판에 껴서 아무 조작 없이 시간 초과로만 넘긴 판이 연달아 몇 번인지.</summary>
+        public int IdleRounds;
 
         public bool Connected => ConnectionId != null;
     }
@@ -38,6 +42,11 @@ namespace DiceHeist.Server.Multi
         public const int MaxSeats = 6;
         /// <summary>앉을 때 머니에서 테이블로 가져가는 금액(앤티 50번분).</summary>
         public const int BuyIn = 50_000;
+        /// <summary>
+        /// 이만큼 연달아 아무 조작 없이 판을 넘기면 자리 비움으로 돌린다. 탭을 열어 둔 채 자리를 뜨면
+        /// 굴리기는 자동 확정·베팅은 자동 폴드되면서 판마다 앤티만 나가 바이인을 다 잃었다.
+        /// </summary>
+        public const int AwayAfterIdleRounds = 2;
 
         public static TableConfig Config => new TableConfig
         {
@@ -60,6 +69,8 @@ namespace DiceHeist.Server.Multi
         DiceGame _game;
         List<RoomSeat> _inHand = new List<RoomSeat>();
         bool[] _stood = Array.Empty<bool>();
+        /// <summary>이번 판에 스스로 무엇이든 했는지(다시 굴리기·확정·베팅). 자리 비움을 가린다.</summary>
+        bool[] _acted = Array.Empty<bool>();
         int _dealer;
         string _banner;
 
@@ -161,7 +172,7 @@ namespace DiceHeist.Server.Multi
             return removed;
         }
 
-        List<RoomSeat> ReadySeats() => Seats.Where(s => s.Connected && !s.Leaving && s.Stack >= _cfg.Ante).ToList();
+        List<RoomSeat> ReadySeats() => Seats.Where(s => s.Connected && !s.Leaving && !s.Away && s.Stack >= _cfg.Ante).ToList();
 
         void StartRound(DateTimeOffset now, List<RoomSeat> ready)
         {
@@ -176,6 +187,7 @@ namespace DiceHeist.Server.Multi
             _game.StartRound();
             SyncStacks();
             _stood = new bool[_inHand.Count];
+            _acted = new bool[_inHand.Count];
             _banner = null;
             RoundNo++;
             Log($"{RoundNo}판 시작 · 앤티 (참가비) {_cfg.Ante:N0}씩 · 선 {_inHand[0].Name}");
@@ -237,6 +249,16 @@ namespace DiceHeist.Server.Multi
 
         List<RoomSeat> EndRound()
         {
+            foreach (var s in _inHand)
+            {
+                if (s.Leaving) continue;
+                s.IdleRounds = _acted[s.GameIndex] ? 0 : s.IdleRounds + 1;
+                if (s.IdleRounds >= AwayAfterIdleRounds && !s.Away)
+                {
+                    s.Away = true;
+                    Log($"{s.Name} 님이 자리를 비웠다 ({AwayAfterIdleRounds}판 동안 움직임 없음 · 앤티 안 냄)");
+                }
+            }
             // 나가는 중이거나, 연결이 끊겼거나, 앤티를 낼 수 없는 사람은 일어난다
             var removed = Seats.Where(s => s.Leaving || !s.Connected || s.Stack < _cfg.Ante).ToList();
             foreach (var s in removed)
@@ -269,6 +291,7 @@ namespace DiceHeist.Server.Multi
             if (held.All(h => h)) return "모두 고정하면 다시 굴릴 수 없습니다.";
             if (!_game.CanReroll(p)) return "다시 굴리기를 다 썼습니다.";
             _game.Reroll(p, held);
+            _acted[seat.GameIndex] = true;
             if (!_game.CanReroll(p)) _stood[seat.GameIndex] = true;
             Advance(now);
             return null;
@@ -278,6 +301,7 @@ namespace DiceHeist.Server.Multi
         {
             if (Phase != "hold" || P(seat) == null) return "지금은 확정할 수 없습니다.";
             _stood[seat.GameIndex] = true;
+            _acted[seat.GameIndex] = true;
             Advance(now);
             return null;
         }
@@ -295,9 +319,29 @@ namespace DiceHeist.Server.Multi
                 case "raise": request = BetAction.Raise; break;
                 default: return "알 수 없는 베팅입니다.";
             }
+            _acted[seat.GameIndex] = true;
             ApplyBet(request, raiseTo);
             if (!_game.Betting.IsDone) Deadline = now + _t.Bet;
             Advance(now);
+            return null;
+        }
+
+        /// <summary>잠깐 쉬기: 다음 판부터 끼지 않는다(지금 판은 그대로 끝까지 한다).</summary>
+        public string SitOut(RoomSeat seat)
+        {
+            if (seat.Away) return "이미 쉬는 중입니다.";
+            seat.Away = true;
+            Log($"{seat.Name} 님이 잠깐 쉰다");
+            return null;
+        }
+
+        /// <summary>자리 비움에서 돌아온다. 다음 판부터 다시 낀다.</summary>
+        public string Back(RoomSeat seat)
+        {
+            if (!seat.Away) return "쉬는 중이 아닙니다.";
+            seat.Away = false;
+            seat.IdleRounds = 0;
+            Log($"{seat.Name} 님이 돌아왔다");
             return null;
         }
 
@@ -342,6 +386,7 @@ namespace DiceHeist.Server.Multi
                         stack = s.Stack,
                         connected = s.Connected,
                         leaving = s.Leaving,
+                        away = s.Away,
                         inHand = p != null,
                         rerolls = p?.Rerolls ?? 0,
                         stood = p != null && Phase == "hold" && _stood[s.GameIndex],
