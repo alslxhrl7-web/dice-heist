@@ -56,7 +56,47 @@ namespace DiceHeist.Game
                 case AnimalKind.Raccoon: Raccoon(actor, fur); break;
                 default: Cat(actor, fur); break;
             }
+
+            // VARCO로 만든 3D 모델(Assets/Art/Characters/3D/Resources/Characters3D, glTFast로 가져옴)이 있으면 도형 대신 그것을 보인다.
+            // 피벗(Body·Head·ArmR)은 연출(숨쉬기·던지기·처지기)과 손 위치 계산에 그대로 쓰고, 모델은 Body에 붙여 함께 움직인다
+            var model = Resources.Load<GameObject>(ModelFolder + "/" + kind.ToString().ToLowerInvariant());
+            if (model != null) UseModel(actor, model);
             return actor;
+        }
+
+        /// <summary>Resources 안에서 3D 모델이 있는 폴더.</summary>
+        public const string ModelFolder = "Characters3D";
+        /// <summary>도형 동물과 같은 키(머리 꼭대기·귀 끝까지).</summary>
+        const float ModelHeight = 2.4f;
+
+        static void UseModel(AnimalActor actor, GameObject prefab)
+        {
+            foreach (var r in actor.GetComponentsInChildren<Renderer>()) r.enabled = false;
+
+            var inst = Object.Instantiate(prefab, actor.Body, false);
+            inst.name = "Model";
+            var renderers = inst.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
+
+            // Body 기준 좌표로 모델 크기를 재서 바닥을 0에, 가운데를 몸 중심에 맞추고 키를 맞춘다
+            Vector3 min = Vector3.positiveInfinity, max = Vector3.negativeInfinity;
+            foreach (var r in renderers)
+            {
+                var b = r.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = new Vector3((i & 1) == 0 ? b.min.x : b.max.x, (i & 2) == 0 ? b.min.y : b.max.y, (i & 4) == 0 ? b.min.z : b.max.z);
+                    var local = actor.Body.InverseTransformPoint(corner);
+                    min = Vector3.Min(min, local);
+                    max = Vector3.Max(max, local);
+                }
+            }
+            float height = max.y - min.y;
+            if (height <= 0.0001f) return;
+            float k = ModelHeight / height;
+            inst.transform.localScale *= k;
+            var center = (min + max) * 0.5f;
+            inst.transform.localPosition -= new Vector3(center.x, min.y, center.z) * k;
         }
 
         static void Eyes(Transform h, float x, float z, Color iris, float size)
