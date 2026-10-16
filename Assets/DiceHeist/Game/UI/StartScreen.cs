@@ -34,6 +34,7 @@ namespace DiceHeist.Game
         bool _online;
         string _account;
         string _notice;
+        bool _bossCleared;
 
         /// <param name="online">서버 계정이면 true. 오프라인이면 기록 지우기, 온라인이면 로그아웃 버튼이 나온다.</param>
         /// <param name="notice">맨 위에 띄울 알림(서버 오류 등). 없으면 null.</param>
@@ -47,6 +48,7 @@ namespace DiceHeist.Game
             screen._online = online;
             screen._account = profile.name;
             screen._notice = notice;
+            screen._bossCleared = profile.bossCleared;
             screen.Canvas = go.GetComponent<Canvas>();
             screen.Canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             screen.Canvas.sortingOrder = 10;
@@ -93,7 +95,10 @@ namespace DiceHeist.Game
                 string state = open ? "<color=#2c8a57>입장 가능</color>"
                     : cfg.MinChips > _chips ? $"<color=#8b958f>{cfg.MinChips:N0}칩부터 입장</color>"
                     : "<color=#8b958f>칩이 모자람</color>";
-                string label = $"<size=36><b>{cfg.Name}</b></size>\n앤티 {cfg.Ante}칩\n한도 {cfg.ChipCap:N0}칩\n{state}";
+                string limit = cfg.BossRounds > 0
+                    ? (_bossCleared ? "<color=#2c8a57>보스 격파 · 한도 없음</color>" : $"보스전 {cfg.BossRounds}판에 {cfg.ChipCap:N0}칩")
+                    : $"한도 {cfg.ChipCap:N0}칩";
+                string label = $"<size=36><b>{cfg.Name}</b></size>\n앤티 {cfg.Ante}칩\n{limit}\n{state}";
                 var btn = Button(card, "Btn_table" + i, label, open ? Accent : Locked,
                     new Vector2(-387 + i * 258, 170), new Vector2(240, 200), 21, () => TableChosen?.Invoke(cfg));
                 btn.interactable = open;

@@ -91,7 +91,7 @@ namespace DiceHeist.Game
             }
             else
             {
-                _hud.SetTable($"{_v.table} 테이블 · {Ante} {_v.ante}칩 · 한도 {_v.chipCap:N0}칩" + (_backend.Online ? "" : " · 오프라인"));
+                SetTableLine();
                 Log($"{_v.table} 테이블에 앉았다 · {_v.seats[0].chips:N0}칩");
                 // 테이블 등급마다 상대 동물(브론즈 너구리·고양이, 실버 여우·너구리, 골드 보스 곰·여우)과 딜러(펭귄)가 다르다.
                 // 상대가 바뀌면 새 동물이 다시 걸어 나온다
@@ -168,6 +168,7 @@ namespace DiceHeist.Game
             }
 
             Log($"{_v.roundNo}판 시작 · {Ante} {_v.ante}칩씩");
+            SetTableLine();
             Phase = "rolling";
             _turnSeat = -1;
             _showHand = false;
@@ -377,8 +378,28 @@ namespace DiceHeist.Game
             Phase = "result";
             SyncShown();
             Refresh();
-            yield return Choose(new ButtonSpec("next", "다음 판", ButtonStyle.Primary), new ButtonSpec("tables", "테이블 선택"));
-            if (_choice == "tables") _leave = true;
+            if (!string.IsNullOrEmpty(_v.bossResult))
+            {
+                // 보스전이 끝났다: 이 테이블에서는 더 못 한다
+                bool won = _v.bossResult == "won";
+                Log(won ? $"보스 곰 격파! ({_v.bossRound}판)" : $"보스전 {_v.bossRounds}판이 끝났다");
+                _hud.SetHint(won
+                    ? "보스 곰을 이겼습니다! 이제 골드 한도가 풀립니다. 테이블 선택에서 다시 앉아 칩을 더 벌고, 멀티용으로 환전하세요."
+                    : $"{_v.bossRounds}판 안에 {_v.chipCap:N0}칩을 못 채워 보스전에 졌습니다. 테이블 선택에서 다시 도전하세요.");
+                if (won)
+                {
+                    _celebration.Play(HandRank.FiveDice);
+                    React(1, TableMoment.Lose);
+                }
+                else React(1, TableMoment.Win);
+                yield return Choose(new ButtonSpec("tables", "테이블 선택", ButtonStyle.Primary));
+                _leave = true;
+            }
+            else
+            {
+                yield return Choose(new ButtonSpec("next", "다음 판", ButtonStyle.Primary), new ButtonSpec("tables", "테이블 선택"));
+                if (_choice == "tables") _leave = true;
+            }
         }
 
         /// <summary>
@@ -495,6 +516,14 @@ namespace DiceHeist.Game
             Refresh();
             _celebration.Play(rank);
             React(0, TableMoment.BigHand);
+        }
+
+        /// <summary>왼쪽 아래 테이블 설명 줄. 보스전이면 몇 번째 판인지도.</summary>
+        void SetTableLine()
+        {
+            string cap = _v.chipCap == int.MaxValue ? "한도 없음" : $"한도 {_v.chipCap:N0}칩";
+            string boss = _v.bossRounds > 0 ? $" · <color=#c4426a><b>보스전 {Math.Max(1, _v.bossRound)}/{_v.bossRounds}판</b></color>" : "";
+            _hud.SetTable($"{_v.table} 테이블 · {Ante} {_v.ante}칩 · {cap}{boss}" + (_backend.Online ? "" : " · 오프라인"));
         }
 
         /// <summary>자리 동물의 몸짓과 말풍선. 동물마다 성격대로(AnimalLines).</summary>

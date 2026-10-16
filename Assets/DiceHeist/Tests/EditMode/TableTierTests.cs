@@ -28,18 +28,20 @@ namespace DiceHeist.Tests
             var t = TableConfig.Tiers;
             Assert.AreEqual(new[] { "브론즈", "실버", "골드" }, new[] { t[0].Name, t[1].Name, t[2].Name });
             Assert.AreEqual(500, TableConfig.Bronze.StartChips);
-            Assert.AreEqual(1000, TableConfig.Bronze.ChipCap);
-            Assert.AreEqual(700, TableConfig.Silver.MinChips);
-            Assert.AreEqual(1500, TableConfig.Silver.ChipCap);
-            Assert.AreEqual(1000, TableConfig.Gold.MinChips);
-            Assert.AreEqual(2000, TableConfig.Gold.ChipCap);
+            Assert.AreEqual(1500, TableConfig.Bronze.ChipCap); // 2026-10-16: 1,000 → 1,500
+            Assert.AreEqual(1200, TableConfig.Silver.MinChips);
+            Assert.AreEqual(2500, TableConfig.Silver.ChipCap);
+            Assert.AreEqual(2000, TableConfig.Gold.MinChips);
+            Assert.AreEqual(3000, TableConfig.Gold.ChipCap, "골드 보스전 목표");
+            Assert.AreEqual(40, TableConfig.Gold.BossRounds);
+            Assert.AreEqual(0, TableConfig.Silver.BossRounds);
         }
 
         [TestCase(500, true, false, false)]
-        [TestCase(699, true, false, false)]
-        [TestCase(700, true, true, false)]
-        [TestCase(999, true, true, false)]
-        [TestCase(1000, true, true, true)]
+        [TestCase(1199, true, false, false)]
+        [TestCase(1200, true, true, false)]
+        [TestCase(1999, true, true, false)]
+        [TestCase(2000, true, true, true)]
         [TestCase(5, true, false, false)]
         public void 가진_칩으로_입장할_수_있는_테이블(int chips, bool bronze, bool silver, bool gold)
         {
@@ -48,8 +50,8 @@ namespace DiceHeist.Tests
             Assert.AreEqual(gold, TableConfig.Gold.CanEnter(chips), "골드");
         }
 
-        [TestCase(999, false)]
-        [TestCase(1000, true)]
+        [TestCase(1499, false)]
+        [TestCase(1500, true)]
         public void 브론즈_한도에_닿으면_멀티가_열린다(int chips, bool open)
         {
             Assert.AreEqual(open, TableConfig.ClearsBronze(chips));
@@ -66,17 +68,17 @@ namespace DiceHeist.Tests
         [Test]
         public void 가지고_앉은_칩으로_시작한다()
         {
-            var g = new DiceGame(TableConfig.Silver, new SeededRandom(1), 820);
-            Assert.AreEqual(820, g.Human.Chips);
+            var g = new DiceGame(TableConfig.Silver, new SeededRandom(1), 1320);
+            Assert.AreEqual(1320, g.Human.Chips);
         }
 
         [Test]
         public void 한도를_넘게_따면_넘친_만큼은_못_받는다()
         {
-            var g = new DiceGame(TableConfig.Bronze, new SeededRandom(1), 990);
+            var g = new DiceGame(TableConfig.Bronze, new SeededRandom(1), 1490);
             var res = HumanWinsRound(g); // 앤티 10 + 콜 10씩, 팟 60
-            Assert.AreEqual(1000, g.Human.Chips);
-            Assert.AreEqual(990 - 20 + 60 - 1000, res.OverCap);
+            Assert.AreEqual(1500, g.Human.Chips);
+            Assert.AreEqual(1490 - 20 + 60 - 1500, res.OverCap);
         }
 
         [Test]
@@ -91,21 +93,21 @@ namespace DiceHeist.Tests
         [Test]
         public void 한도_위에서_앉으면_더_벌지는_못해도_줄지는_않는다()
         {
-            var g = new DiceGame(TableConfig.Bronze, new SeededRandom(1), 1400);
+            var g = new DiceGame(TableConfig.Bronze, new SeededRandom(1), 1900);
             HumanWinsRound(g);
-            Assert.AreEqual(1400, g.Human.Chips);
+            Assert.AreEqual(1900, g.Human.Chips);
         }
 
         [Test]
         public void 실버와_골드의_한도()
         {
-            var s = new DiceGame(TableConfig.Silver, new SeededRandom(1), 1490);
+            var s = new DiceGame(TableConfig.Silver, new SeededRandom(1), 2490);
             HumanWinsRound(s);
-            Assert.AreEqual(1500, s.Human.Chips);
+            Assert.AreEqual(2500, s.Human.Chips);
 
-            var gold = new DiceGame(TableConfig.Gold, new SeededRandom(1), 1990);
+            var gold = new DiceGame(TableConfig.Gold, new SeededRandom(1), 2990);
             HumanWinsRound(gold);
-            Assert.AreEqual(2000, gold.Human.Chips);
+            Assert.AreEqual(3000, gold.Human.Chips);
         }
         [Test]
         public void 테이블마다_상대_동물과_딜러가_다르고_이름도_따라간다()

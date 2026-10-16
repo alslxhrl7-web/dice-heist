@@ -17,6 +17,8 @@ namespace DiceHeist.Game
         public long money;
         public bool bronzeCleared;
         public int exchangeable;
+        /// <summary>골드 보스를 이긴 적이 있는지(이기면 골드 한도가 풀린다). 서버는 아직 보내지 않아 온라인에서는 늘 false</summary>
+        public bool bossCleared;
     }
 
     /// <summary>
@@ -182,6 +184,7 @@ namespace DiceHeist.Game
         const string ChipsKey = "DiceHeist.Chips";
         const string MoneyKey = "DiceHeist.CyberMoney";
         const string ClearedKey = "DiceHeist.BronzeCleared";
+        const string BossKey = "DiceHeist.BossCleared";
 
         readonly IRandom _rng;
         readonly bool _save;
@@ -190,6 +193,7 @@ namespace DiceHeist.Game
         public int Chips { get; private set; }
         public long Money { get; private set; }
         public bool BronzeCleared { get; private set; }
+        public bool BossCleared { get; private set; }
         public bool Online => false;
 
         public LocalBackend(IRandom rng, bool save)
@@ -200,6 +204,7 @@ namespace DiceHeist.Game
             // PlayerPrefs에는 long이 없어 문자열로 둔다
             Money = save && long.TryParse(PlayerPrefs.GetString(MoneyKey, "0"), out var m) ? m : 0;
             BronzeCleared = save && PlayerPrefs.GetInt(ClearedKey, 0) == 1;
+            BossCleared = save && PlayerPrefs.GetInt(BossKey, 0) == 1;
         }
 
         /// <summary>테스트용: 지금 앉은 테이블.</summary>
@@ -216,7 +221,7 @@ namespace DiceHeist.Game
                 else if (!cfg.CanEnter(Chips)) v = new SingleView { error = $"{cfg.Name}은(는) {cfg.MinChips:N0}칩 이상 있어야 앉을 수 있습니다." };
                 else
                 {
-                    _table = new SingleTable(cfg, _rng, Chips);
+                    _table = new SingleTable(cfg, _rng, Chips, BossCleared);
                     v = _table.Look();
                 }
             }
@@ -240,6 +245,7 @@ namespace DiceHeist.Game
                 }
                 Chips = _table.Chips;
                 if (TableConfig.ClearsBronze(Chips)) BronzeCleared = true;
+                if (_table.BossWon) BossCleared = true;
                 Save();
             }
             v.bronzeCleared = BronzeCleared;
@@ -275,6 +281,7 @@ namespace DiceHeist.Game
             Chips = TableConfig.Bronze.StartChips;
             Money = 0;
             BronzeCleared = false;
+            BossCleared = false;
             _table = null;
             Save();
         }
@@ -282,6 +289,7 @@ namespace DiceHeist.Game
         Profile Me() => new Profile
         {
             name = "오프라인", chips = Chips, money = Money, bronzeCleared = BronzeCleared, exchangeable = ChipExchange.Exchangeable(Chips),
+            bossCleared = BossCleared,
         };
 
         void Save()
@@ -289,6 +297,7 @@ namespace DiceHeist.Game
             if (!_save) return;
             PlayerPrefs.SetInt(ChipsKey, Chips);
             PlayerPrefs.SetInt(ClearedKey, BronzeCleared ? 1 : 0);
+            PlayerPrefs.SetInt(BossKey, BossCleared ? 1 : 0);
             PlayerPrefs.SetString(MoneyKey, Money.ToString());
             PlayerPrefs.Save();
         }

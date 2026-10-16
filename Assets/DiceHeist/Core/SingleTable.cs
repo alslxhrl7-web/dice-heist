@@ -82,6 +82,11 @@ namespace DiceHeist.Core
         /// <summary>내 차례에 고를 수 있는 레이즈 크기(이번 판 누적, 참가비 제외). 올릴 수 없으면 0.</summary>
         public int minRaise;
         public int maxRaise;
+        /// <summary>보스전 판 수(0이면 보스전 없음)와 지금 몇 번째 판인지</summary>
+        public int bossRounds;
+        public int bossRound;
+        /// <summary>보스전 결과: "" 진행 중 / won 이김 / lost 짐. 결과가 나면 이 테이블에서는 더 못 하고 일어나야 한다</summary>
+        public string bossResult;
         public bool canCall;
         public bool canRaise;
         public bool raiseUsed;
@@ -103,10 +108,27 @@ namespace DiceHeist.Core
         ResultView _result;
         string _phase = "idle";
 
-        public SingleTable(TableConfig cfg, IRandom rng, int chips)
+        readonly bool _boss;
+        int _bossRound;
+        string _bossResult = "";
+
+        /// <param name="bossCleared">이 사람이 보스를 이긴 적이 있으면 보스전 없이, 한도도 없이 앉는다.</param>
+        public SingleTable(TableConfig cfg, IRandom rng, int chips, bool bossCleared = false)
         {
+            if (cfg.BossRounds > 0 && bossCleared)
+            {
+                cfg = cfg.Clone();
+                cfg.BossRounds = 0;
+                cfg.ChipCap = int.MaxValue;
+            }
+            _boss = cfg.BossRounds > 0;
             _g = new DiceGame(cfg, rng, chips);
         }
+
+        /// <summary>이 자리에서 보스를 이겼는지.</summary>
+        public bool BossWon => _bossResult == "won";
+        /// <summary>보스전이 끝나(이기거나 져서) 이 테이블에서는 더 할 수 없는지.</summary>
+        public bool BossOver => _bossResult != "";
 
         public DiceGame Game => _g;
         public TableConfig Config => _g.Config;
@@ -122,6 +144,7 @@ namespace DiceHeist.Core
         public SingleView Start()
         {
             if (InRound) return View("이미 판이 진행 중입니다.");
+            if (BossOver) return View("보스전이 끝났습니다. 테이블 선택에서 다시 앉으세요.");
             foreach (var p in _g.RefillAi()) Add(new TableEvent { kind = "refill", seat = p.Index, count = p.Chips });
             if (_g.HumanIsBroke)
             {
@@ -129,6 +152,7 @@ namespace DiceHeist.Core
                 return View(null);
             }
             _g.StartRound();
+            if (_boss) _bossRound++;
             _result = null;
             _phase = "hold";
             Add(new TableEvent { kind = "start", seat = _g.Starter });
@@ -238,6 +262,12 @@ namespace DiceHeist.Core
             };
             _phase = "result";
             Add(new TableEvent { kind = "showdown" });
+            if (_boss)
+            {
+                if (_g.Human.Chips >= _g.Config.ChipCap) _bossResult = "won";
+                else if (_bossRound >= _g.Config.BossRounds) _bossResult = "lost";
+                if (_bossResult != "") Add(new TableEvent { kind = "boss", action = _bossResult, count = _bossRound });
+            }
         }
 
         void Add(TableEvent e) => _events.Add(e);
@@ -298,6 +328,9 @@ namespace DiceHeist.Core
                 raiseUsed = bet != null && bet.RaiseUsed,
                 responding = bet != null && bet.Responding,
                 result = _phase == "result" ? _result : null,
+                bossRounds = _boss ? cfg.BossRounds : 0,
+                bossRound = _bossRound,
+                bossResult = _bossResult,
             };
             _events.Clear();
             return view;

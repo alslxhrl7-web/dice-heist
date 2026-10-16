@@ -261,12 +261,17 @@ namespace DiceHeist.Game
         public void ShowBanner(string text, bool win)
         {
             _bannerBg.gameObject.SetActive(true);
+            _potText.transform.parent.gameObject.SetActive(false); // 배너가 팟 표시 자리에 뜬다(판이 끝나면 팟은 0)
             _bannerBg.color = win ? Good : Card;
             _bannerText.color = win ? Color.white : Ink;
             _bannerText.text = text;
         }
 
-        public void HideBanner() => _bannerBg.gameObject.SetActive(false);
+        public void HideBanner()
+        {
+            _bannerBg.gameObject.SetActive(false);
+            _potText.transform.parent.gameObject.SetActive(true);
+        }
 
         public void ShowButtons(params ButtonSpec[] specs)
         {

@@ -77,7 +77,7 @@ dotnet test Server/DiceHeist.Server.Tests
 
 ## 실행과 검증
 
-에디터가 이 프로젝트를 열고 있으면 배치 모드 명령은 실패한다. 먼저 에디터를 닫는다.
+사용자 결정(2026-10-16): 에디터를 끄지 않는다. 테스트는 열린 에디터에서 보이게 돌린다 — `Temp/DiceHeist.cmd`에 한 줄 명령(refresh / play / stop / test-edit / test-play / only <클래스 전체 이름>)을 쓰면 `EditorRemote`가 실행하고 `Temp/DiceHeist.result`에 결과를 쓴다. 빌드는 사용자가 직접 한다(Claude는 빌드하지 않는다). 아래 배치 모드 명령은 에디터가 닫혀 있을 때만 쓴다(열려 있으면 실패한다).
 
 ```powershell
 $u = "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe"

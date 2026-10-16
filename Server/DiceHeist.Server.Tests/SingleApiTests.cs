@@ -85,7 +85,7 @@ namespace DiceHeist.Server.Tests
         public async Task 칩이_모자라면_실버에_앉을_수_없다()
         {
             var v = await Post("/api/single/sit", new { table = "실버" });
-            StringAssert.Contains("700", v.GetProperty("error").GetString());
+            StringAssert.Contains(TableConfig.Silver.MinChips.ToString("N0"), v.GetProperty("error").GetString());
         }
 
         [Test]
@@ -137,8 +137,8 @@ namespace DiceHeist.Server.Tests
         public async Task 브론즈_한도에_닿으면_멀티가_열린다()
         {
             var db = _factory.Services.GetRequiredService<Db>();
-            Assert.IsFalse(db.SaveSingleChips(1, 999, TableConfig.ClearsBronze(999)));
-            Assert.IsTrue(db.SaveSingleChips(1, 1000, TableConfig.ClearsBronze(1000)));
+            Assert.IsFalse(db.SaveSingleChips(1, TableConfig.Bronze.ChipCap - 1, TableConfig.ClearsBronze(TableConfig.Bronze.ChipCap - 1)));
+            Assert.IsTrue(db.SaveSingleChips(1, TableConfig.Bronze.ChipCap, TableConfig.ClearsBronze(TableConfig.Bronze.ChipCap)));
             Assert.IsTrue(db.SaveSingleChips(1, 300, TableConfig.ClearsBronze(300)), "한 번 열리면 칩이 줄어도 닫히지 않는다");
             var me = await (await _http.GetAsync("/api/me")).Content.ReadFromJsonAsync<JsonElement>();
             Assert.IsTrue(me.GetProperty("bronzeCleared").GetBoolean());

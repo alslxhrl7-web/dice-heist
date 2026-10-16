@@ -37,15 +37,22 @@ namespace DiceHeist.Core
         /// </summary>
         public string[] Cast = { "raccoon", "cat" };
         public string Dealer = "penguin";
+        /// <summary>
+        /// 보스전: 0보다 크면 앉은 뒤 이 판 수 안에 한도(ChipCap)까지 벌어야 보스를 이긴다. 못 벌면 보스전에 지고 테이블에서 일어나야 한다.
+        /// 보스를 한 번 이기면 그 사람에게는 보스전이 없어지고 한도가 풀린다(SingleTable의 bossCleared).
+        /// </summary>
+        public int BossRounds;
+
+        public TableConfig Clone() => (TableConfig)MemberwiseClone();
 
         /// <summary>
-        /// 입문 테이블. 사람도 AI도 500칩으로 시작하고, 사람은 1,000칩까지 벌 수 있다.
+        /// 입문 테이블. 사람도 AI도 500칩으로 시작하고, 사람은 1,500칩까지 벌 수 있다(2026-10-16: 1,000→1,500, 20판 남짓에 끝나 너무 짧았다).
         /// 주사위 확률은 모두 같고 상대 AI만 서툴다: 다시 굴리기 1회, 65% 확률로 제 패를 거꾸로 읽는다.
         /// 사람이 AI와 같은 기준으로 남기고 콜만 해도 약 70% 이기고, 판당 평균 +21칩쯤 번다.
         /// </summary>
         public static TableConfig Bronze => new TableConfig
         {
-            Name = "브론즈", MinChips = 0, ChipCap = 1000, Ante = 10, StartChips = 500, AiStartChips = 500,
+            Name = "브론즈", MinChips = 0, ChipCap = 1500, Ante = 10, StartChips = 500, AiStartChips = 500,
             AiMaxRerolls = 1, AiMisread = 0.65,
         };
 
@@ -53,20 +60,24 @@ namespace DiceHeist.Core
         public static bool ClearsBronze(int chips) => chips >= Bronze.ChipCap;
 
         /// <summary>
-        /// 700칩 이상 가지고 있어야 입장, 1,500칩까지. AI는 다시 굴리기 2회, 배짱은 절반, 30% 확률로 제 패를 거꾸로 읽는다.
+        /// 1,200칩 이상 가지고 있어야 입장, 2,500칩까지(2026-10-16: 700·1,500에서 올림). AI는 다시 굴리기 2회, 배짱은 절반, 30% 확률로 제 패를 거꾸로 읽는다.
         /// 브론즈와 같은 방식으로 치면 약 60% 이기고, 판당 평균 +13칩쯤 번다.
         /// </summary>
         public static TableConfig Silver => new TableConfig
         {
-            Name = "실버", MinChips = 700, ChipCap = 1500, Ante = 20, AiStartChips = 1500, Cast = new[] { "fox", "raccoon" },
+            Name = "실버", MinChips = 1200, ChipCap = 2500, Ante = 20, AiStartChips = 2500, Cast = new[] { "fox", "raccoon" },
             AiMaxRerolls = 2, AiNerve = 0.5, AiMisread = 0.3,
         };
 
-        /// <summary>1,000칩 이상 가지고 있어야 입장, 2,000칩까지. AI는 제 실력(웹 프로토타입과 같은 판단).</summary>
+        /// <summary>
+        /// 2,000칩 이상 가지고 있어야 입장. 보스 곰과의 보스전: 앉은 뒤 40판 안에 3,000칩까지 벌면 이긴다(2026-10-16).
+        /// 예전에는 한도 2,000에 언젠가는 닿기만 하면 돼서, 운 좋은 한 번으로 누구나 깼다. 보스를 이기면 한도가 풀린다.
+        /// AI는 제 실력(웹 프로토타입과 같은 판단).
+        /// </summary>
         public static TableConfig Gold => new TableConfig
         {
-            Name = "골드", MinChips = 1000, ChipCap = 2000, Ante = 30, AiStartChips = 2000, Cast = new[] { "bear", "fox" }, // 곰이 보스
-            AiMaxRerolls = 2, AiNerve = 1.0,
+            Name = "골드", MinChips = 2000, ChipCap = 3000, Ante = 30, AiStartChips = 3000, Cast = new[] { "bear", "fox" }, // 곰이 보스
+            AiMaxRerolls = 2, AiNerve = 1.0, BossRounds = 40,
         };
 
         /// <summary>낮은 등급부터.</summary>

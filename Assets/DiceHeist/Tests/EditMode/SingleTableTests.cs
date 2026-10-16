@@ -111,11 +111,11 @@ namespace DiceHeist.Tests
         public void 브론즈_한도를_넘게_따면_결과에_넘친_칩이_나온다()
         {
             var cfg = TableConfig.Bronze;
-            var t = new SingleTable(cfg, new SeededRandom(2), 995);
+            var t = new SingleTable(cfg, new SeededRandom(2), cfg.ChipCap - 5);
             for (int i = 0; i < 40; i++)
             {
                 var v = PlayRound(t);
-                Assert.LessOrEqual(v.seats[0].chips, 1000);
+                Assert.LessOrEqual(v.seats[0].chips, cfg.ChipCap);
                 if (v.result.overCap > 0) return;
             }
             Assert.Pass("40판 안에 한도를 넘은 판이 없었다(한도 자체는 위에서 확인)");
