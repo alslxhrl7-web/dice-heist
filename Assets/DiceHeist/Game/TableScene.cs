@@ -116,7 +116,7 @@ namespace DiceHeist.Game
             animal.RememberFacing();
             seat.Animal = animal;
             // 이름표는 동물을 가리지 않게: 내 것은 머리 위, 상대는 바깥쪽 옆
-            seat.LabelAnchor = Fx.Pivot("LabelAnchor", transform, seatPos + (mine ? new Vector3(-0.1f, 3.4f, 0) : new Vector3(Mathf.Sign(seatPos.x) * 2.9f, 0.9f, 0)));
+            seat.LabelAnchor = Fx.Pivot("LabelAnchor", transform, seatPos + (mine ? new Vector3(1.7f, 2.3f, -0.5f) : new Vector3(Mathf.Sign(seatPos.x) * 2.9f, 0.9f, 0)));
             // 말풍선은 테이블 안쪽, 머리 높이
             Vector3 inward = -seatPos;
             inward.y = 0;

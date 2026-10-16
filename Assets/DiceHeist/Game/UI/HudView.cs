@@ -180,6 +180,7 @@ namespace DiceHeist.Game
             {
                 if (anchor == null || rect == null) continue;
                 Vector3 sp = _cam.WorldToScreenPoint(anchor.position);
+                if (sp.z < 0f) { rect.anchoredPosition = new Vector2(100000f, 0f); continue; } // 카메라 뒤면 화면 밖으로
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, sp, uiCam, out var local))
                     rect.anchoredPosition = local;
             }

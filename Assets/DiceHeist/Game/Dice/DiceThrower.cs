@@ -21,6 +21,8 @@ namespace DiceHeist.Game
             public Quaternion[] Rot;
             /// <summary>이 프레임에 일어난 충돌의 세기(0~1). 없으면 null. 재생할 때 소리를 낸다.</summary>
             public List<float> Impacts;
+            /// <summary>바닥을 구르는 정도(0~1). 구르는 소리의 크기</summary>
+            public float Roll;
         }
 
         /// <summary>속도가 한 스텝에 이만큼 넘게 바뀌면 부딪힌 것으로 본다(중력만으로는 한 스텝 0.2).</summary>
@@ -57,12 +59,14 @@ namespace DiceHeist.Game
                     if (frames[k].Impacts != null)
                         foreach (float s in frames[k].Impacts) DiceAudio.Impact(s);
                 played = f;
+                DiceAudio.SetRoll(frames[f].Roll);
                 for (int i = 0; i < dice.Count; i++)
                     dice[i].transform.SetPositionAndRotation(frames[f].Pos[i], frames[f].Rot[i]);
                 if (f == last) break;
                 yield return null;
                 t += Time.deltaTime;
             }
+            DiceAudio.SetRoll(0f);
             Physics.SyncTransforms();
         }
 
@@ -112,6 +116,9 @@ namespace DiceHeist.Game
                         lastHit[i] = now;
                         (fr.Impacts ??= new List<float>()).Add(Mathf.Clamp01(dv / 6f));
                     }
+                    // 바닥에 닿아 있으면서 움직이는 주사위만 "구른다"
+                    if (fr.Pos[i].y < dice[i].Size * 0.8f)
+                        fr.Roll += Mathf.Clamp01((v.magnitude + dice[i].Body.angularVelocity.magnitude * 0.08f) / 3f) / dice.Count * 1.6f;
                 }
                 frames.Add(fr);
                 if (asleep && s > 10) break;

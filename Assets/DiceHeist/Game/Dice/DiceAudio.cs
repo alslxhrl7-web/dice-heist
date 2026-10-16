@@ -8,6 +8,9 @@ namespace DiceHeist.Game
     /// - Impact: 굴린 주사위가 테이블·벽·다른 주사위에 부딪힐 때. DiceThrower가 물리 녹화에서 찾은 충돌 시점에 맞춰 부른다
     /// - CupRattle / CupSlam: 상대가 컵을 흔들고 내려놓을 때
     /// - Chips / Fold / Tock / Tick / Win / Lose: 베팅·쇼다운의 테이블 소리
+    /// - SetRoll: 굴러가는 동안 깔리는 펠트 위 "드르르" 소리. DiceThrower가 물리 녹화의 구르는 속도로 크기를 정한다
+    /// 녹음·생성한 파일로 바꾸려면 Resources/Audio에 넣는다: dice_hit*(부딪힘, 여러 개면 번갈아), dice_roll(구르기, 반복 재생).
+    /// 파일이 있으면 그것을, 없으면 합성음을 쓴다.
     /// </summary>
     public sealed class DiceAudio : MonoBehaviour
     {
@@ -25,6 +28,7 @@ namespace DiceHeist.Game
         AudioClip[] _chips;
         AudioClip _swish, _tock, _win, _lose;
         AudioSource[] _voices;
+        AudioSource _roll;
         int _next;
 
         static DiceAudio Instance
@@ -39,8 +43,9 @@ namespace DiceHeist.Game
         void Awake()
         {
             var rng = new System.Random(7);
+            // 펠트 위 주사위: 날카로운 쇳소리 대신 짧고 맑은 "톡"(낮은 공명, 짧은 잔향, 조금 먹먹하게)
             _clacks = new AudioClip[8];
-            for (int i = 0; i < _clacks.Length; i++) _clacks[i] = Clack($"clack{i}", rng, 0.075f, 1700f, 5200f, 0.010f, 0f);
+            for (int i = 0; i < _clacks.Length; i++) _clacks[i] = Clack($"clack{i}", rng, 0.05f, 1300f, 3600f, 0.006f, 0.3f);
             _muffled = new AudioClip[6];
             for (int i = 0; i < _muffled.Length; i++) _muffled[i] = Clack($"muffled{i}", rng, 0.06f, 900f, 2600f, 0.008f, 0.82f);
             _thud = Thud();
@@ -51,6 +56,22 @@ namespace DiceHeist.Game
             // 이기면 올라가는 4음(도-미-솔-높은 도), 지면 내려가는 2음
             _win = Notes("win", 0.9f, 0.22f, 0.35f, (523.3f, 0f), (659.3f, 0.09f), (784f, 0.18f), (1046.5f, 0.27f));
             _lose = Notes("lose", 0.7f, 0.3f, 0.15f, (392f, 0f), (311.1f, 0.2f));
+
+            var rollClip = RollBed();
+
+            // 파일이 있으면 합성음 대신 쓴다(VARCO 등으로 만든 소리를 넣는 자리)
+            var files = Resources.LoadAll<AudioClip>("Audio");
+            var hits = System.Array.FindAll(files, c => c.name.StartsWith("dice_hit"));
+            if (hits.Length > 0) _clacks = hits;
+            var rollFile = System.Array.Find(files, c => c.name == "dice_roll");
+            if (rollFile != null) rollClip = rollFile;
+
+            _roll = gameObject.AddComponent<AudioSource>();
+            _roll.clip = rollClip;
+            _roll.loop = true;
+            _roll.playOnAwake = false;
+            _roll.spatialBlend = 0f;
+            _roll.volume = 0f;
 
             _voices = new AudioSource[Voices];
             for (int i = 0; i < Voices; i++)
@@ -73,6 +94,26 @@ namespace DiceHeist.Game
             _next = (_next + 1) % _voices.Length;
             s.pitch = pitch;
             s.PlayOneShot(clip, Mathf.Clamp01(volume) * Volume);
+        }
+
+        float _rollTarget;
+
+        void Update()
+        {
+            // 구르는 소리는 갑자기 끊기지 않게 부드럽게 따라간다
+            if (_roll == null) return;
+            float target = _rollTarget * Volume * 0.55f;
+            _roll.volume = Mathf.MoveTowards(_roll.volume, target, Time.unscaledDeltaTime * 2.5f);
+            if (_roll.volume > 0.001f && !_roll.isPlaying) _roll.Play();
+            else if (_roll.volume <= 0.001f && _roll.isPlaying && _rollTarget <= 0f) _roll.Stop();
+        }
+
+        /// <summary>굴러가는 소리 크기(0~1). 0이면 잦아들며 멈춘다.</summary>
+        public static void SetRoll(float level)
+        {
+            var a = Instance;
+            a._rollTarget = Mathf.Clamp01(level);
+            if (a._roll != null) a._roll.pitch = 0.9f + 0.25f * a._rollTarget;
         }
 
         /// <summary>주사위 한 번 부딪힘. strength는 0~1(충돌 세기).</summary>
@@ -162,7 +203,7 @@ namespace DiceHeist.Game
                 float tone = 0f;
                 for (int k = 0; k < modes; k++) tone += amp[k] * Mathf.Sin(2f * Mathf.PI * freq[k] * t) * Mathf.Exp(-t / (decay * (0.6f + k * 0.25f)));
                 float noise = ((float)rng.NextDouble() * 2f - 1f) * Mathf.Exp(-t / (decay * 0.35f));
-                float x = env * (0.55f * tone / modes + 0.6f * noise);
+                float x = env * (0.7f * tone / modes + 0.3f * noise); // 잡음을 줄여 맑게
                 lp = lowpass > 0f ? lp + (1f - lowpass) * (x - lp) : x;
                 data[i] = lp;
                 peak = Mathf.Max(peak, Mathf.Abs(lp));
@@ -214,6 +255,50 @@ namespace DiceHeist.Game
             }
             for (int i = 0; i < n; i++) data[i] = data[i] / peak * 0.7f;
             var clip = AudioClip.Create("swish", n, 1, Rate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        /// <summary>
+        /// 펠트 위를 구르는 "드르르": 갈색 잡음을 낮게 거르고, 주사위 모서리가 닿는 작은 틱을 촘촘히 섞는다. 1.6초 반복용(앞뒤를 겹쳐 이음매가 안 들리게).
+        /// </summary>
+        static AudioClip RollBed()
+        {
+            int n = (int)(Rate * 1.6f);
+            var data = new float[n];
+            var rng = new System.Random(19);
+            float brown = 0f, lp = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                brown = Mathf.Clamp(brown + ((float)rng.NextDouble() * 2f - 1f) * 0.04f, -1f, 1f) * 0.998f;
+                lp += 0.08f * (brown - lp);
+                data[i] = lp * 2.2f;
+            }
+            // 모서리 틱: 10~25ms 간격의 아주 짧은 톡
+            int t = 0;
+            while (t < n)
+            {
+                float amp = 0.08f + 0.1f * (float)rng.NextDouble();
+                float f = 1800f + 1600f * (float)rng.NextDouble();
+                for (int k = 0; k < Rate * 0.004f && t + k < n; k++)
+                {
+                    float tt = k / (float)Rate;
+                    data[t + k] += amp * Mathf.Sin(2f * Mathf.PI * f * tt) * Mathf.Exp(-tt / 0.0012f);
+                }
+                t += (int)(Rate * (0.010f + 0.015f * (float)rng.NextDouble()));
+            }
+            // 반복 이음매: 끝 0.1초를 앞과 겹쳐 섞는다
+            int fade = (int)(Rate * 0.1f);
+            for (int i = 0; i < fade; i++)
+            {
+                float k = i / (float)fade;
+                data[i] = data[i] * k + data[n - fade + i] * (1f - k);
+            }
+            System.Array.Resize(ref data, n - fade);
+            float peak = 1e-6f;
+            foreach (var v in data) peak = Mathf.Max(peak, Mathf.Abs(v));
+            for (int i = 0; i < data.Length; i++) data[i] = data[i] / peak * 0.8f;
+            var clip = AudioClip.Create("roll", data.Length, 1, Rate, false);
             clip.SetData(data, 0);
             return clip;
         }

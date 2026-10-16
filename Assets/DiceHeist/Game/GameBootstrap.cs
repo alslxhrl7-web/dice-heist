@@ -61,6 +61,7 @@ namespace DiceHeist.Game
             Cam.clearFlags = CameraClearFlags.SolidColor;
             Cam.backgroundColor = new Color(0.72f, 0.79f, 0.75f);
             if (Cam.GetComponent<PhysicsRaycaster>() == null) Cam.gameObject.AddComponent<PhysicsRaycaster>();
+            CameraRig.Attach(Cam); // 단계마다 구도를 옮긴다(TableDirector.Phase)
 
             if (FindAnyObjectByType<Light>() == null)
             {

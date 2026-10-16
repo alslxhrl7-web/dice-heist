@@ -50,7 +50,38 @@ namespace DiceHeist.Game
         public event Action<string> Left;
 
         /// <summary>지금 단계: entrance / connecting / rolling / hold / ai / betting / bet / respond / reveal / result / broke / error</summary>
-        public string Phase { get; private set; } = "idle";
+        public string Phase
+        {
+            get => _phase;
+            private set
+            {
+                _phase = value;
+                // 단계마다 카메라 구도: 내 주사위는 내려다보고, 상대를 상대할 때는 토끼 뒤 3인칭
+                var rig = _rig != null ? _rig : (_rig = Camera.main != null ? Camera.main.GetComponent<CameraRig>() : null);
+                if (rig == null) return;
+                switch (value)
+                {
+                    case "rolling":
+                    case "hold":
+                        rig.Go(CameraShot.Dice);
+                        break;
+                    case "ai":
+                    case "betting":
+                    case "bet":
+                    case "respond":
+                    case "reveal":
+                    case "result":
+                        rig.Go(CameraShot.Table);
+                        break;
+                    case "entrance":
+                    case "idle":
+                        rig.Go(CameraShot.Overview);
+                        break;
+                }
+            }
+        }
+        string _phase = "idle";
+        CameraRig _rig;
         public int RoundsFinished => _played;
         /// <summary>마지막으로 받은 테이블 상태.</summary>
         public SingleView View => _v;
