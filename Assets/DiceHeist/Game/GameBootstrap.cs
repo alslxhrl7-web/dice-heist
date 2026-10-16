@@ -56,7 +56,7 @@ namespace DiceHeist.Game
                 Cam.tag = "MainCamera";
             }
             Cam.transform.position = new Vector3(0f, 12.5f, -11.5f);
-            Cam.transform.LookAt(new Vector3(0f, 0f, -1.6f));
+            Cam.transform.LookAt(new Vector3(0f, 0.3f, -1.2f)); // 의자에 앉은 동물 머리(딜러 펭귄)까지 화면에 들어오게
             Cam.fieldOfView = 42f;
             Cam.clearFlags = CameraClearFlags.SolidColor;
             Cam.backgroundColor = new Color(0.72f, 0.79f, 0.75f);

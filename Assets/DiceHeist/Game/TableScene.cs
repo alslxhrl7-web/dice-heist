@@ -22,6 +22,9 @@ namespace DiceHeist.Game
         }
 
         public const float FloorY = -0.9f;
+        /// <summary>동물이 앉은 높이(의자 위). 바닥에 서 있으면 탁자 가장자리에 몸이 가려 머리만 보였다</summary>
+        public const float SeatY = -0.15f;
+        static readonly Color Stool = new Color(0.55f, 0.40f, 0.29f);
         const float MyDieSize = 0.5f;
         const float OppDieSize = 0.5f;
 
@@ -41,7 +44,7 @@ namespace DiceHeist.Game
         /// <summary>테이블 머리(상대 둘 사이 뒤쪽)에 서 있는 딜러. 판에는 끼지 않는다.</summary>
         public AnimalActor Dealer { get; private set; }
         AnimalKind _dealerKind;
-        static readonly Vector3 DealerSpot = new Vector3(0f, FloorY, 6.3f);
+        static readonly Vector3 DealerSpot = new Vector3(0f, SeatY, 5.6f);
         /// <summary>딜러 말풍선 자리(얼굴 바로 아래, 테이블 위).</summary>
         public Transform DealerBubbleAnchor { get; private set; }
         public Transform PotAnchor { get; private set; }
@@ -55,8 +58,8 @@ namespace DiceHeist.Game
 
             // 바닥과 테이블
             Fx.Prim(PrimitiveType.Plane, root, new Vector3(0, FloorY, 0), Vector3.one * 8f, new Color(0.72f, 0.79f, 0.75f), name: "Floor");
-            Fx.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.2f, 0), new Vector3(11f, 0.18f, 11f), Wood, name: "TableRim");
-            Fx.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.1f, 0), new Vector3(10.4f, 0.1f, 10.4f), Felt, name: "TableFelt");
+            Fx.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.2f, 0), new Vector3(9.7f, 0.18f, 9.7f), Wood, name: "TableRim");
+            Fx.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.1f, 0), new Vector3(9.2f, 0.1f, 9.2f), Felt, name: "TableFelt");
             Fx.Prim(PrimitiveType.Cylinder, root, new Vector3(0, -0.6f, 0), new Vector3(2.4f, 0.3f, 2.4f), Wood, name: "TableLeg");
 
             var floorCol = new GameObject("TableCollider").AddComponent<BoxCollider>();
@@ -67,9 +70,12 @@ namespace DiceHeist.Game
             scene.BuildRollZone();
 
             // 자리 0: 나(토끼, 왼쪽 앞 테이블 가장자리. 카메라에 옆모습이 보이게) / 1: 너구리 / 2: 고양이
-            scene.Seats[0] = scene.BuildSeat(0, AnimalKind.Rabbit, new Vector3(-4.7f, FloorY, -2.4f), true);
-            scene.Seats[1] = scene.BuildSeat(1, AnimalKind.Raccoon, new Vector3(-3.6f, FloorY, 4.6f), false);
-            scene.Seats[2] = scene.BuildSeat(2, AnimalKind.Cat, new Vector3(3.6f, FloorY, 4.6f), false);
+            scene.Seats[0] = scene.BuildSeat(0, AnimalKind.Rabbit, new Vector3(-4.9f, SeatY, -2.2f), true);
+            scene.Seats[1] = scene.BuildSeat(1, AnimalKind.Raccoon, new Vector3(-3.3f, SeatY, 4.2f), false);
+            scene.Seats[2] = scene.BuildSeat(2, AnimalKind.Cat, new Vector3(3.3f, SeatY, 4.2f), false);
+            // 동물이 앉는 둥근 의자(바닥에서 앉은 높이까지)
+            foreach (var s in scene.Seats) scene.AddStool(s.Animal.Seat);
+            scene.AddStool(DealerSpot);
 
             scene.Seats[0].RowCenter = new Vector3(0.4f, MyDieSize * 0.5f, -3.3f);
             scene.Seats[0].RowSpacing = 0.74f;
@@ -106,16 +112,16 @@ namespace DiceHeist.Game
             var animal = AnimalBuilder.Build(kind, transform);
             animal.Seat = seatPos;
             animal.transform.position = seatPos;
-            animal.FaceTowards(mine ? new Vector3(ZoneCenter.x - 1.2f, 0, ZoneCenter.z) : Vector3.zero);
+            animal.FaceTowards(mine ? new Vector3(-1.0f, 0, -5.5f) : Vector3.zero); // 토끼는 탁자와 카메라 사이를 봐서 얼굴이 보이게
             animal.RememberFacing();
             seat.Animal = animal;
             // 이름표는 동물을 가리지 않게: 내 것은 머리 위, 상대는 바깥쪽 옆
-            seat.LabelAnchor = Fx.Pivot("LabelAnchor", transform, seatPos + (mine ? new Vector3(-0.1f, 3.9f, 0) : new Vector3(Mathf.Sign(seatPos.x) * 3.0f, 1.3f, 0)));
+            seat.LabelAnchor = Fx.Pivot("LabelAnchor", transform, seatPos + (mine ? new Vector3(-0.1f, 3.4f, 0) : new Vector3(Mathf.Sign(seatPos.x) * 2.9f, 0.9f, 0)));
             // 말풍선은 테이블 안쪽, 머리 높이
             Vector3 inward = -seatPos;
             inward.y = 0;
             seat.BubbleAnchor = Fx.Pivot("BubbleAnchor", transform,
-                seatPos + (mine ? new Vector3(1.3f, 2.5f, 0.6f) : inward.normalized * 1.3f + Vector3.up * 2.3f));
+                seatPos + (mine ? new Vector3(1.3f, 2.1f, 0.6f) : inward.normalized * 1.3f + Vector3.up * 1.9f));
 
             float size = mine ? MyDieSize : OppDieSize;
             seat.Dice = new DieView[5];
@@ -144,6 +150,12 @@ namespace DiceHeist.Game
         }
 
         /// <summary>Characters.Ids("fox" 등)를 AnimalKind로. 모르는 id면 fallback.</summary>
+        void AddStool(Vector3 seat)
+        {
+            float h = SeatY - FloorY;
+            Fx.Prim(PrimitiveType.Cylinder, transform, new Vector3(seat.x, FloorY + h * 0.5f, seat.z), new Vector3(1.5f, h * 0.5f, 1.5f), Stool, name: "Stool");
+        }
+
         public static AnimalKind KindOf(string id, AnimalKind fallback) =>
             !string.IsNullOrEmpty(id) && System.Enum.TryParse(id, true, out AnimalKind k) ? k : fallback;
 
