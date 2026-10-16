@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using DiceHeist.Core;
 using TMPro;
@@ -109,8 +110,8 @@ namespace DiceHeist.Game
             _log.textWrappingMode = TextWrappingModes.Normal;
             Stretch(_log.rectTransform, 18, 50, 18, 10);
 
-            // 왼쪽 위: 족보 표 (높은 순)
-            var ranks = Panel(root, new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -20), new Vector2(336, 250));
+            // 오른쪽 위: 족보 표 (높은 순). 왼쪽 위는 너구리 이름표 자리
+            var ranks = Panel(root, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-24, -20), new Vector2(336, 250));
             var ranksTitle = Label(ranks, "족보 (높은 순)", 24, TextAlignmentOptions.TopLeft, Ink);
             Stretch(ranksTitle.rectTransform, 18, 12, 18, 12);
             var ranksHead = Label(ranks, "1회 굴림 확률", 17, TextAlignmentOptions.TopRight, Muted);
@@ -130,7 +131,7 @@ namespace DiceHeist.Game
             Stretch(rankOdds.rectTransform, 18, 52, 18, 10);
 
             // 가운데 위: 결과 배너
-            var banner = Panel(root, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -8), new Vector2(860, 92)); // 두 줄: 결과 + 이긴 이유
+            var banner = Panel(root, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -330), new Vector2(860, 92)); // 두 줄: 결과 + 이긴 이유. 펭귄 딜러 얼굴을 가리지 않게 테이블 가운데
             _bannerBg = banner.GetComponent<Image>();
             _bannerText = Label(banner, "", 30, TextAlignmentOptions.Center, Ink);
             Stretch(_bannerText.rectTransform, 10, 4, 10, 4);
@@ -160,7 +161,7 @@ namespace DiceHeist.Game
             // 자리 이름표와 판돈: 3D 위치를 따라다닌다
             for (int i = 0; i < seatAnchors.Length; i++)
             {
-                var tag = Panel(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(360, i == 0 ? 80 : 124));
+                var tag = Panel(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(290, i == 0 ? 80 : 124));
                 _seatBgs[i] = tag.GetComponent<Image>();
                 _seatTexts[i] = Label(tag, "", 21, TextAlignmentOptions.Center, Ink);
                 Stretch(_seatTexts[i].rectTransform, 8, 4, 8, 4);
@@ -177,10 +178,62 @@ namespace DiceHeist.Game
             Camera uiCam = Canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : Canvas.worldCamera;
             foreach (var (anchor, rect) in _followers)
             {
+                if (anchor == null || rect == null) continue;
                 Vector3 sp = _cam.WorldToScreenPoint(anchor.position);
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, sp, uiCam, out var local))
                     rect.anchoredPosition = local;
             }
+            _followers.RemoveAll(f => f.anchor == null || f.rect == null);
+        }
+
+        // ---------- 말풍선 ----------
+
+        readonly Dictionary<Transform, RectTransform> _bubbles = new Dictionary<Transform, RectTransform>();
+
+        /// <summary>anchor 위에 짧은 말풍선을 seconds 동안 띄운다. 같은 자리의 앞 말풍선은 바로 바뀐다.</summary>
+        public void Say(Transform anchor, string text, float seconds = 1.8f)
+        {
+            if (anchor == null || string.IsNullOrEmpty(text)) return;
+            if (_bubbles.TryGetValue(anchor, out var old) && old != null) Destroy(old.gameObject);
+
+            float width = Mathf.Clamp(46 + text.Length * 24, 120, 420);
+            var bubble = Panel(_canvasRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(width, 54));
+            bubble.name = "Bubble";
+            bubble.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.97f);
+            // 아래로 삐죽 나온 꼬리
+            var tail = NewRect("Tail", bubble);
+            tail.anchorMin = tail.anchorMax = new Vector2(0.5f, 0f);
+            tail.sizeDelta = new Vector2(16, 16);
+            tail.anchoredPosition = new Vector2(0, -2);
+            tail.localRotation = Quaternion.Euler(0, 0, 45f);
+            var tailImg = tail.gameObject.AddComponent<Image>();
+            tailImg.color = new Color(1f, 1f, 1f, 0.97f);
+            tailImg.raycastTarget = false;
+            tail.SetAsFirstSibling();
+
+            var label = Label(bubble, text, 24, TextAlignmentOptions.Center, Ink);
+            Stretch(label.rectTransform, 8, 2, 8, 2);
+            _followers.Add((anchor, bubble));
+            _bubbles[anchor] = bubble;
+            StartCoroutine(PopBubble(bubble, seconds));
+        }
+
+        IEnumerator PopBubble(RectTransform bubble, float seconds)
+        {
+            // 톡 튀어나왔다가, 끝날 때 살짝 작아지며 사라진다
+            for (float e = 0; e < 0.12f && bubble != null; e += Time.unscaledDeltaTime)
+            {
+                bubble.localScale = Vector3.one * Mathf.Lerp(0.6f, 1.08f, e / 0.12f);
+                yield return null;
+            }
+            if (bubble != null) bubble.localScale = Vector3.one;
+            for (float e = 0; e < seconds && bubble != null; e += Time.deltaTime) yield return null;
+            for (float e = 0; e < 0.15f && bubble != null; e += Time.deltaTime)
+            {
+                bubble.localScale = Vector3.one * Mathf.Lerp(1f, 0.7f, e / 0.15f);
+                yield return null;
+            }
+            if (bubble != null) Destroy(bubble.gameObject);
         }
 
         // ---------- 갱신 ----------

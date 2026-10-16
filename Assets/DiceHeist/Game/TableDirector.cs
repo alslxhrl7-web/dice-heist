@@ -177,6 +177,7 @@ namespace DiceHeist.Game
             _hud.ShowButtons();
             _hud.SetHint("주사위를 굴리는 중…");
             Refresh();
+            DealerSays(TableMoment.DealerStart);
             yield return Fx.All(this,
                 _scene.ThrowMine(new[] { 0, 1, 2, 3, 4 }, _v.seats[0].dice),
                 _scene.ShakeCup(1),
@@ -301,6 +302,7 @@ namespace DiceHeist.Game
                 Phase = "reveal";
                 SyncShown();
                 _shownPot = res.pot;
+                DealerSays(TableMoment.DealerShowdown);
                 var order = new List<int>();
                 for (int i = 1; i < _v.seats.Length; i++)
                     if (_v.seats[i].revealed && Has(_v.seats[i].dice))
@@ -350,11 +352,15 @@ namespace DiceHeist.Game
             if (iWon) DiceAudio.Win();
             else if (!_v.seats[me].folded) DiceAudio.Lose();
 
+            // 이긴 동물은 세 번 뛰며 한 바퀴, 진 동물은 동물마다(곰은 엉엉) 아쉬워한다. 포기한 동물은 이미 처져 있다
             for (int i = 0; i < _v.seats.Length; i++)
             {
-                var animal = _scene.Seats[i].Animal;
-                if (_v.seats[i].winner) StartCoroutine(animal.Cheer());
-                else animal.SetDroop(true);
+                if (_v.seats[i].winner) React(i, TableMoment.Win);
+                else
+                {
+                    if (!_v.seats[i].folded) React(i, TableMoment.Lose);
+                    _scene.Seats[i].Animal.SetDroop(true);
+                }
             }
 
             int chips = _v.seats[me].chips;
@@ -451,18 +457,20 @@ namespace DiceHeist.Game
                                 s.folded = true;
                                 Log($"{s.name} · {Fold}");
                                 animal.SetDroop(true);
+                                React(e.seat, TableMoment.Fold);
                                 DiceAudio.Fold();
                                 break;
                             case "call":
                                 s.status = "called";
                                 Log($"{s.name} · {Call} +{e.paid} · {Times(s.contrib)}");
                                 DiceAudio.Chips(e.paid / Math.Max(1, _v.ante));
+                                React(e.seat, TableMoment.Call);
                                 break;
                             case "raise":
                                 s.status = "raised";
                                 DiceAudio.Chips(e.paid / Math.Max(1, _v.ante), 0.9f);
                                 Log($"{s.name} · {Raise} +{e.paid} · {Times(s.contrib)}");
-                                StartCoroutine(animal.Bounce());
+                                React(e.seat, TableMoment.Raise);
                                 break;
                         }
                         Phase = "betting";
@@ -486,7 +494,25 @@ namespace DiceHeist.Game
             Log($"나 · {HandEvaluator.NameOf(rank)}!");
             Refresh();
             _celebration.Play(rank);
-            StartCoroutine(_scene.Seats[0].Animal.Cheer());
+            React(0, TableMoment.BigHand);
+        }
+
+        /// <summary>자리 동물의 몸짓과 말풍선. 동물마다 성격대로(AnimalLines).</summary>
+        void React(int seat, TableMoment moment)
+        {
+            var s = _scene.Seats[seat];
+            if (s.Animal == null) return;
+            s.Animal.React(AnimalLines.MotionFor(s.Animal.Kind, moment));
+            _hud.Say(s.BubbleAnchor, AnimalLines.LineFor(s.Animal.Kind, moment, _v.ante));
+        }
+
+        /// <summary>딜러(펭귄)의 안내 한마디.</summary>
+        void DealerSays(TableMoment moment)
+        {
+            var d = _scene.Dealer;
+            if (d == null) return;
+            d.React(Reaction.Wave);
+            _hud.Say(_scene.DealerBubbleAnchor, AnimalLines.LineFor(d.Kind, moment, _v.ante), 1.4f);
         }
 
         (SeatView[] seats, int pot) Snapshot() => (Copy(_v.seats), _v.pot);

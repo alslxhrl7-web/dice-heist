@@ -25,6 +25,7 @@ namespace DiceHeist.Game
             var root = new GameObject(kind.ToString());
             root.transform.SetParent(parent, false);
             var actor = root.AddComponent<AnimalActor>();
+            actor.Kind = kind;
 
             Color fur, belly;
             switch (kind)

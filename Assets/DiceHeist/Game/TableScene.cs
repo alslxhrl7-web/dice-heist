@@ -16,6 +16,8 @@ namespace DiceHeist.Game
             public Vector3 RowCenter;
             public float RowSpacing;
             public Transform LabelAnchor;
+            /// <summary>말풍선이 뜨는 자리. 동물이 바뀌어도 그대로다.</summary>
+            public Transform BubbleAnchor;
             public AnimalKind Kind;
         }
 
@@ -40,6 +42,8 @@ namespace DiceHeist.Game
         public AnimalActor Dealer { get; private set; }
         AnimalKind _dealerKind;
         static readonly Vector3 DealerSpot = new Vector3(0f, FloorY, 6.3f);
+        /// <summary>딜러 말풍선 자리(얼굴 바로 아래, 테이블 위).</summary>
+        public Transform DealerBubbleAnchor { get; private set; }
         public Transform PotAnchor { get; private set; }
         Transform _potPile;
         int _potShown = -1;
@@ -62,14 +66,15 @@ namespace DiceHeist.Game
 
             scene.BuildRollZone();
 
-            // 자리 0: 나(토끼, 카메라 쪽) / 1: 너구리 / 2: 고양이
-            scene.Seats[0] = scene.BuildSeat(0, AnimalKind.Rabbit, new Vector3(-3.7f, FloorY, -4.5f), true);
+            // 자리 0: 나(토끼, 왼쪽 앞 테이블 가장자리. 카메라에 옆모습이 보이게) / 1: 너구리 / 2: 고양이
+            scene.Seats[0] = scene.BuildSeat(0, AnimalKind.Rabbit, new Vector3(-4.7f, FloorY, -2.4f), true);
             scene.Seats[1] = scene.BuildSeat(1, AnimalKind.Raccoon, new Vector3(-3.6f, FloorY, 4.6f), false);
             scene.Seats[2] = scene.BuildSeat(2, AnimalKind.Cat, new Vector3(3.6f, FloorY, 4.6f), false);
 
             scene.Seats[0].RowCenter = new Vector3(0.4f, MyDieSize * 0.5f, -3.3f);
             scene.Seats[0].RowSpacing = 0.74f;
 
+            scene.DealerBubbleAnchor = Fx.Pivot("DealerBubble", root, DealerSpot + new Vector3(0f, 2.1f, -1.4f));
             scene.PotAnchor = Fx.Pivot("PotAnchor", root, new Vector3(0, 0.2f, 1.1f));
             scene._potPile = Fx.Pivot("PotPile", root, new Vector3(0, 0, 0.2f));
             return scene;
@@ -104,7 +109,13 @@ namespace DiceHeist.Game
             animal.FaceTowards(mine ? new Vector3(ZoneCenter.x - 1.2f, 0, ZoneCenter.z) : Vector3.zero);
             animal.RememberFacing();
             seat.Animal = animal;
-            seat.LabelAnchor = Fx.Pivot("LabelAnchor", transform, seatPos + (mine ? new Vector3(-0.2f, 3.9f, 0) : new Vector3(Mathf.Sign(seatPos.x) * 2.5f, 1.2f, 0)));
+            // 이름표는 동물을 가리지 않게: 내 것은 머리 위, 상대는 바깥쪽 옆
+            seat.LabelAnchor = Fx.Pivot("LabelAnchor", transform, seatPos + (mine ? new Vector3(-0.1f, 3.9f, 0) : new Vector3(Mathf.Sign(seatPos.x) * 3.0f, 1.3f, 0)));
+            // 말풍선은 테이블 안쪽, 머리 높이
+            Vector3 inward = -seatPos;
+            inward.y = 0;
+            seat.BubbleAnchor = Fx.Pivot("BubbleAnchor", transform,
+                seatPos + (mine ? new Vector3(1.3f, 2.5f, 0.6f) : inward.normalized * 1.3f + Vector3.up * 2.3f));
 
             float size = mine ? MyDieSize : OppDieSize;
             seat.Dice = new DieView[5];
@@ -151,6 +162,7 @@ namespace DiceHeist.Game
                 Dealer.Seat = DealerSpot;
                 Dealer.transform.position = DealerSpot;
                 Dealer.FaceTowards(new Vector3(0f, 0f, -4.5f));
+                Dealer.Kind = dk;
                 Dealer.RememberFacing();
                 _dealerKind = dk;
             }
@@ -187,7 +199,7 @@ namespace DiceHeist.Game
                 var a = Seats[i].Animal;
                 Vector3 outward = a.Seat;
                 outward.y = 0;
-                a.transform.position = a.Seat + outward.normalized * 7f;
+                a.PlaceAway(a.Seat + outward.normalized * 7f);
                 routines[i] = DelayedHop(a, i * 0.25f);
             }
             yield return Fx.All(this, routines);
