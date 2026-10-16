@@ -11,7 +11,7 @@
 나(토끼) + AI 너구리·고양이가 브론즈 테이블(참가비 10칩)에서 한 판을 끝까지 한다.
 굴리기 → 남기기(최대 2회) → 걸기(포기 / 따라가기 / 올리기) → 공개.
 
-- 확인됨: EditMode 테스트 131개(.NET으로 실행), 서버 테스트 49개, PlayMode 자동 진행 테스트, Windows 실행 파일에서 주사위 클릭 고정과 다시 굴리기
+- 확인됨: EditMode 테스트 131개(.NET으로 실행), 서버 테스트 51개, PlayMode 자동 진행 테스트, Windows 실행 파일에서 주사위 클릭 고정과 다시 굴리기
 - 직접 눌러 확인하지 못함: 베팅 버튼과 공개 단계의 마우스 조작(자동 진행 테스트로만 확인)
 - 임시 수준: 화면 톤(조명·색), 동물 모델(기본 도형 조립)
 
@@ -51,7 +51,7 @@ C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일
 - 멀티 입장 조건은 없다(2026-10-14 사용자 결정: 브론즈 통과 조건 제거). 가입하면 사이버머니 100,000(`Db.StarterMoney`, 바이인 두 번어치)을 받고, 그 전에 가입한 계정도 서버가 켜질 때 한 번 받는다(장부 kind `starter`로 중복 방지). 이유: 브론즈는 PC 게임에서만 통과할 수 있어 브라우저로만 오는 사람은 멀티를 열 수 없었다. 머니가 모자라면 싱글에서 칩을 벌어 환전하거나, 구제 머니를 받는다: 머니가 바이인보다 적고 테이블에 앉아 있지 않으면 하루(한국 시간 자정 기준) 한 번 바이인(50,000)까지 채운다(`Db.ClaimRescue`, 장부 kind `rescue`, 2026-10-16. 브라우저로만 하는 사람은 다 잃으면 다시 앉을 길이 없었다). "테스트 머니 받기"(`/api/dev/grant`)는 개발 모드에서만 켜지고, 서비스(운영)에서는 기본으로 꺼져 있다(`install-service.ps1 -AllowGrant:$true`로만 켠다)
 - 싱글 판 중에 나가거나 서버가 꺼지면 그 판에 낸 칩(앤티·베팅)은 잃는다(세션은 메모리에만 있다)
 - 늘 켜 두기: Windows 서비스 `DiceHeist`(`Server/deploy/install-service.ps1`, 관리자 권한, `C:\DiceHeist`에 배포·DB·하루 1회 백업) + Tailscale Funnel로 외부 HTTPS. 서버는 localhost에서만 받는다. 순서는 `Server/deploy/README.md`
-- 외부 주소: https://desktop-5omono1.tailab2121.ts.net/ (2026-10-14 휴대폰 LTE로 접속 확인). Tailscale CLI는 PATH에 없어 `C:\Program Files\Tailscale\tailscale.exe`로 부른다
+- 외부 주소(바뀌면 `GameBootstrap.serverUrl`과 `wwwroot` 두 페이지의 og 주소도 바꾼다): https://desktop-5omono1.tailab2121.ts.net/ (2026-10-14 휴대폰 LTE로 접속 확인). Tailscale CLI는 PATH에 없어 `C:\Program Files\Tailscale\tailscale.exe`로 부른다
 
 ```powershell
 dotnet run --project Server/DiceHeist.Server --launch-profile http   # http://localhost:5080

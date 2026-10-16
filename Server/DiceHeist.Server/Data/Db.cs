@@ -188,6 +188,13 @@ CREATE TABLE IF NOT EXISTS ledger (
             return v == null ? null : (long)v;
         }
 
+        /// <summary>기한이 지난 로그인 토큰을 지운다. 지운 수.</summary>
+        public int DeleteExpiredSessions(DateTimeOffset now)
+        {
+            using var c = Open();
+            return Exec(c, null, "DELETE FROM sessions WHERE expires_at <= $now", ("$now", now.ToUniversalTime().ToString("O")));
+        }
+
         public void DeleteSession(string token)
         {
             using var c = Open();
