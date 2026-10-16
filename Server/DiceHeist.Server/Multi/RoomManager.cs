@@ -52,6 +52,9 @@ namespace DiceHeist.Server.Multi
             lock (_gate) return (_rooms.Count, _rooms.Values.Sum(r => r.Seats.Count));
         }
 
+        /// <summary>감정 표현(Room.Emotes의 번호)을 보낸다.</summary>
+        public string Emote(long userId, int kind) => Act(userId, (room, seat, now) => room.Emote(seat, kind, now));
+
         public bool IsInRoom(long userId)
         {
             lock (_gate) return RoomOf(userId) != null;

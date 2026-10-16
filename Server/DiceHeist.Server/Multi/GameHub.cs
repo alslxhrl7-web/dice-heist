@@ -144,6 +144,7 @@ namespace DiceHeist.Server.Multi
         public string CreateRoom(string name) => _rooms.Create(UserId, name, Context.ConnectionId);
         public string JoinRoom(string roomId) => _rooms.Join(UserId, roomId, Context.ConnectionId);
         public string LeaveRoom() => _rooms.Leave(UserId);
+        public string Emote(int kind) => _rooms.Emote(UserId, kind);
         public string Reroll(bool[] held) => _rooms.Reroll(UserId, held);
         public string Stand() => _rooms.Stand(UserId);
         public string Bet(string action) => _rooms.Bet(UserId, action);

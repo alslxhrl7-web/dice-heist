@@ -80,6 +80,7 @@ async function connect() {
   conn.on('state', s => {
     cue(state, s);
     state = s;
+    stateAt = Date.now();
     clockOffset = s.serverNow - Date.now();
     const me = s.seats[s.mySeat];
     // 판이 바뀌거나 내 주사위가 바뀌면(다시 굴림) 고정 표시를 지운다
@@ -99,6 +100,24 @@ async function connect() {
   render();
 }
 
+// ---------- 감정 표현 ----------
+
+let stateAt = 0, bubbleTimer = null;
+// 서버는 보낸 지 3초가 안 된 감정 표현만 보낸다(ago = 그때까지 지난 시간). 상태를 받은 뒤 지난 시간을 더해 남은 만큼만 띄우고, 끝나면 다시 그린다
+function bubble(p) {
+  if (!p?.emote) return '';
+  const age = p.emote.ago + (Date.now() - stateAt);
+  if (age >= 3000) return '';
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(render, 3000 - age + 50);
+  return `<span class="bubble" style="animation-delay:-${age}ms" aria-live="polite">${esc(p.emote.text)}</span>`;
+}
+
+$('emotes').addEventListener('click', e => {
+  const b = e.target.closest('[data-emote]');
+  if (b) invoke('Emote', +b.dataset.emote);
+});
+
 // ---------- 소리와 내 차례 알림 ----------
 
 // 바로 전 상태와 비교해 무슨 일이 일어났는지 보고 소리를 낸다. 자리는 사람이 나가면 밀리므로 이름으로 맞춘다
@@ -109,6 +128,10 @@ function cue(prev, s) {
   const was = mine && before.get(mine.name);
   // 처음 받은 상태(접속·새로고침)에는 소리를 내지 않는다
   if (prev) cueSounds(prev, s, mine, was, before, sameRound);
+  if (prev) {
+    const seqs = new Map(prev.seats.map(p => [p.name, p.emote?.seq]));
+    if (s.seats.some(p => p.emote && p.emote.seq !== seqs.get(p.name))) Sound.play('pop');
+  }
 
   const turnNow = (s.phase === 'betting' && s.me?.myTurn) || (s.phase === 'hold' && s.me?.canReroll);
   const turnBefore = prev && ((prev.phase === 'betting' && prev.me?.myTurn) || (prev.phase === 'hold' && prev.me?.canReroll && sameRound));
@@ -322,11 +345,17 @@ function renderRanking() {
 
 function renderGame() {
   const s = state, mine = s.seats[s.mySeat], me = s.me;
+  // 감정 표현 버튼은 서버가 주는 목록으로 한 번만 만든다
+  const em = $('emotes'), emKey = (s.room.emotes || []).join('|');
+  if (em.dataset.key !== emKey) {
+    em.dataset.key = emKey;
+    em.innerHTML = (s.room.emotes || []).map((t, i) => `<button class="btn" data-emote="${i}" aria-label="감정 표현 보내기: ${esc(t)}">${esc(t)}</button>`).join('');
+  }
   $('roomTitle').textContent = `${s.room.name} · 앤티 ${fmt(s.room.ante)} · ${s.roundNo ? s.roundNo + '판' : '시작 전'}`;
   $('awayBtn').textContent = mine?.away ? '다시 참여' : '잠깐 쉬기';
 
   $('opps').innerHTML = s.seats.map((p, i) => i === s.mySeat ? '' : `
-    <div class="opp ${p.turn ? 'turn' : ''} ${p.folded || !p.connected ? 'out' : ''} ${p.winner ? 'win' : ''}">
+    <div class="opp ${p.turn ? 'turn' : ''} ${p.folded || !p.connected ? 'out' : ''} ${p.winner ? 'win' : ''}">${bubble(p)}
       <div class="top"><strong>${esc(p.name)}</strong>
         <span class="num">${fmt(p.stack)}</span>
         ${p.starter ? '<span class="pill first">선</span>' : ''}
@@ -385,7 +414,7 @@ function renderGame() {
   const dice = mine?.dice;
   const meEl = $('me');
   meEl.className = 'me' + ((holding || me?.myTurn) ? ' turn' : '') + (mine?.winner ? ' win' : '');
-  meEl.innerHTML = `
+  meEl.innerHTML = `${bubble(mine)}
     <div class="top"><strong>${esc(mine?.name)} (나)</strong><span class="num">${fmt(mine?.stack ?? 0)}</span>
       ${mine?.starter ? '<span class="pill first">선</span>' : ''}
       ${mine ? `<span class="pill">리롤 ${mine.rerolls}회</span>${statusPill(mine)}` : ''}</div>

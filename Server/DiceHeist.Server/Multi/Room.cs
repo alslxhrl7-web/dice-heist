@@ -29,6 +29,10 @@ namespace DiceHeist.Server.Multi
         public int IdleRounds;
 
         public bool Connected => ConnectionId != null;
+
+        /// <summary>마지막으로 보낸 감정 표현(Room.Emotes의 번호)과 때. Seq는 보낼 때마다 늘어 화면이 새것인지 가린다.</summary>
+        public int EmoteKind = -1, EmoteSeq;
+        public DateTimeOffset EmoteAt;
     }
 
     /// <summary>
@@ -47,6 +51,11 @@ namespace DiceHeist.Server.Multi
         /// 굴리기는 자동 확정·베팅은 자동 폴드되면서 판마다 앤티만 나가 바이인을 다 잃었다.
         /// </summary>
         public const int AwayAfterIdleRounds = 2;
+
+        /// <summary>방에서 보낼 수 있는 짧은 감정 표현. 자유 채팅은 두지 않는다(욕설·도배 관리가 필요 없게).</summary>
+        public static readonly string[] Emotes = { "👍", "😱", "ㅋㅋ", "😎", "🙏", "빨리요!" };
+        /// <summary>감정 표현이 자리 위에 떠 있는 시간과, 한 사람이 다시 보낼 수 있을 때까지의 간격.</summary>
+        public static readonly TimeSpan EmoteShown = TimeSpan.FromSeconds(3), EmoteGap = TimeSpan.FromSeconds(2);
 
         public static TableConfig Config => new TableConfig
         {
@@ -114,6 +123,17 @@ namespace DiceHeist.Server.Multi
         {
             Seats.Add(seat);
             Log($"{seat.Name} 님이 앉았다");
+        }
+
+        /// <summary>감정 표현을 보낸다. 판 중이든 아니든, 앉아 있으면 누구나.</summary>
+        public string Emote(RoomSeat seat, int kind, DateTimeOffset now)
+        {
+            if (kind < 0 || kind >= Emotes.Length) return "없는 감정 표현입니다.";
+            if (seat.EmoteSeq > 0 && now - seat.EmoteAt < EmoteGap) return "잠시 뒤에 다시 보내 주세요.";
+            seat.EmoteKind = kind;
+            seat.EmoteAt = now;
+            seat.EmoteSeq++;
+            return null;
         }
 
         /// <summary>나가기. 판 밖이면 바로 일어나고 true(머니로 돌려줄 것). 판 중이면 이번 판을 포기하고 끝나면 일어난다.</summary>
@@ -382,7 +402,7 @@ namespace DiceHeist.Server.Multi
             var current = Phase == "betting" && bet != null && !bet.IsDone ? bet.Current : null;
             return new
             {
-                room = new { id = Id, name = Name, ante = _cfg.Ante, buyIn = BuyIn, raiseTotal = _cfg.Ante * _cfg.RaiseMultiplier, maxRerolls = _cfg.MaxRerolls },
+                room = new { id = Id, name = Name, ante = _cfg.Ante, buyIn = BuyIn, raiseTotal = _cfg.Ante * _cfg.RaiseMultiplier, maxRerolls = _cfg.MaxRerolls, emotes = Emotes },
                 phase = Phase,
                 deadline = Deadline?.ToUnixTimeMilliseconds(),
                 phaseMs = (long)(Phase switch { "countdown" => _t.Countdown, "hold" => _t.Hold, "betting" => _t.Bet, "result" => _t.Result, _ => TimeSpan.Zero }).TotalMilliseconds,
@@ -401,6 +421,10 @@ namespace DiceHeist.Server.Multi
                         name = s.Name,
                         stack = s.Stack,
                         connected = s.Connected,
+                        // 보낸 지 EmoteShown이 안 된 감정 표현. ago는 보낸 뒤 지난 밀리초(화면이 남은 시간만큼만 띄운다)
+                        emote = s.EmoteSeq > 0 && now - s.EmoteAt < EmoteShown
+                            ? new { seq = s.EmoteSeq, text = Emotes[s.EmoteKind], ago = (long)(now - s.EmoteAt).TotalMilliseconds }
+                            : null,
                         leaving = s.Leaving,
                         away = s.Away,
                         inHand = p != null,

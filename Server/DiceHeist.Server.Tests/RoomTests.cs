@@ -55,6 +55,26 @@ namespace DiceHeist.Server.Tests
         RoomSeat CurrentBettor() => _room.Seats.First(s => SeatState(s, s).GetProperty("turn").GetBoolean());
 
         [Test]
+        public void 감정_표현은_정해진_것만_2초에_한_번_보내고_3초_뒤에_사라진다()
+        {
+            Assert.IsNotNull(_room.Emote(_a, 99, _now), "없는 번호");
+            Assert.IsNull(_room.Emote(_a, 0, _now));
+            var e = SeatState(_b, _a).GetProperty("emote");
+            Assert.AreEqual(Room.Emotes[0], e.GetProperty("text").GetString(), "남에게도 보인다");
+            Assert.AreEqual(1, e.GetProperty("seq").GetInt32());
+
+            _now += TimeSpan.FromSeconds(1);
+            Assert.IsNotNull(_room.Emote(_a, 1, _now), "2초 안에 또 보내면 거절");
+            Assert.AreEqual(1000, SeatState(_b, _a).GetProperty("emote").GetProperty("ago").GetInt64());
+
+            _now += TimeSpan.FromSeconds(2);
+            Assert.AreEqual(JsonValueKind.Null, SeatState(_b, _a).GetProperty("emote").ValueKind, "3초가 지나면 안 보낸다");
+            Assert.IsNull(_room.Emote(_a, 1, _now));
+            Assert.AreEqual(2, SeatState(_b, _a).GetProperty("emote").GetProperty("seq").GetInt32());
+            Assert.IsNull(_room.Emote(_b, 2, _now), "사람마다 따로 센다");
+        }
+
+        [Test]
         public void 한_명이면_시작하지_않고_두_명이면_카운트다운_뒤에_시작한다()
         {
             var solo = new Room("2", "혼자", T, new SeededRandom(1));

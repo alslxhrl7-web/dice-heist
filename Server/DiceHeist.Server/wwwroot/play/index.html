@@ -56,7 +56,14 @@ input{font:inherit;padding:10px 14px;border-radius:12px;border:2px solid var(--l
 .pill.first{background:var(--accent);color:var(--on-accent)}
 .table{background:var(--felt);border:2px solid var(--felt-edge);border-radius:28px;padding:18px;display:flex;flex-direction:column;gap:16px}
 .opps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.opp,.me{background:var(--card);border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;border:3px solid transparent}
+.opp,.me{background:var(--card);border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;border:3px solid transparent;position:relative}
+.emotes{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.emotes .btn{padding:6px 12px;font-size:1rem}
+/* 감정 표현 말풍선: 받은 지 지난 시간만큼 애니메이션을 당겨(animation-delay 음수) 다시 그려도 이어진다 */
+.bubble{position:absolute;top:-14px;right:12px;background:var(--ink);color:var(--card);font-family:var(--display);font-size:1.1rem;padding:4px 12px;border-radius:14px;pointer-events:none;animation:bubble 3s linear forwards;z-index:2}
+.bubble::after{content:"";position:absolute;bottom:-6px;right:18px;border:6px solid transparent;border-top-color:var(--ink);border-bottom:0}
+@keyframes bubble{0%{opacity:0;transform:translateY(6px) scale(.8)}6%{opacity:1;transform:none}85%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.bubble{animation:bubble-still 3s linear forwards}@keyframes bubble-still{0%,85%{opacity:1}100%{opacity:0}}}
 .opp.turn,.me.turn{border-color:var(--accent)}
 .opp.out{opacity:.55}
 .opp.win,.me.win{border-color:var(--good)}
@@ -200,6 +207,7 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
       <div class="timer" aria-hidden="true"><i id="timerBar"></i></div>
       <div id="banner" hidden></div>
       <div class="me" id="me"></div>
+      <div class="emotes" id="emotes" role="group" aria-label="감정 표현 보내기"></div>
       <p class="error" id="gameError"></p>
     </div>
     <div class="panel" style="margin-top:16px">

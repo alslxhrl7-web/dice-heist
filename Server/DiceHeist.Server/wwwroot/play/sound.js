@@ -71,6 +71,8 @@ const Sound = (() => {
     reveal() { const t = ctx.currentTime + 0.01; click(t, 700, 0.35, 0.08); click(t + 0.05, 1400, 0.2); },
     turn() { const t = ctx.currentTime + 0.01; tone(t, 880, 0.18, 0.12, 'triangle'); tone(t + 0.13, 1320, 0.3, 0.12, 'triangle'); },
     win() { const t = ctx.currentTime + 0.02; [523, 659, 784, 1047].forEach((f, i) => tone(t + i * 0.09, f, 0.35, 0.12, 'triangle')); },
+    // 감정 표현이 왔을 때 톡
+    pop() { const t = ctx.currentTime + 0.01; tone(t, 660, 0.08, 0.08, 'sine', 990); },
     lose() { const t = ctx.currentTime + 0.02; tone(t, 392, 0.25, 0.1, 'triangle'); tone(t + 0.18, 294, 0.45, 0.1, 'triangle'); },
   };
 
