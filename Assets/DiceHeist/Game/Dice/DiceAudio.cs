@@ -9,8 +9,9 @@ namespace DiceHeist.Game
     /// - CupRattle / CupSlam: 상대가 컵을 흔들고 내려놓을 때
     /// - Chips / Fold / Tock / Tick / Win / Lose: 베팅·쇼다운의 테이블 소리
     /// - SetRoll: 굴러가는 동안 깔리는 펠트 위 "드르르" 소리. DiceThrower가 물리 녹화의 구르는 속도로 크기를 정한다
-    /// 녹음·생성한 파일로 바꾸려면 Resources/Audio에 넣는다: dice_hit*(부딪힘, 여러 개면 번갈아), dice_roll(구르기, 반복 재생).
-    /// 파일이 있으면 그것을, 없으면 합성음을 쓴다.
+    /// 녹음·생성한 파일로 바꾸려면 Resources/Audio에 넣는다: dice_hit*(부딪힘, 여러 개면 번갈아), dice_roll(구르기, 반복 재생),
+    /// dice_pour(컵에서 쏟아 구르다 멈추는 한 번 전체. 있으면 부딪힘·구르기 합성음 대신 던질 때 한 번 튼다), cup_shake(컵 흔들기).
+    /// 파일이 있으면 그것을, 없으면 합성음을 쓴다. 지금 들어 있는 dice_pour·cup_shake는 VARCO Sound로 만든 "야추 주사위" 소리(2026-10-16).
     /// </summary>
     public sealed class DiceAudio : MonoBehaviour
     {
@@ -29,6 +30,9 @@ namespace DiceHeist.Game
         AudioClip _swish, _tock, _win, _lose;
         AudioSource[] _voices;
         AudioSource _roll;
+        AudioClip _pourClip, _shakeClip;
+        AudioSource _pour, _shake;
+        float _pourFade, _shakeFade;
         int _next;
 
         static DiceAudio Instance
@@ -65,6 +69,10 @@ namespace DiceHeist.Game
             if (hits.Length > 0) _clacks = hits;
             var rollFile = System.Array.Find(files, c => c.name == "dice_roll");
             if (rollFile != null) rollClip = rollFile;
+            _pourClip = System.Array.Find(files, c => c.name == "dice_pour");
+            _shakeClip = System.Array.Find(files, c => c.name == "cup_shake");
+            _pour = OneShotSource();
+            _shake = OneShotSource();
 
             _roll = gameObject.AddComponent<AudioSource>();
             _roll.clip = rollClip;
@@ -81,6 +89,14 @@ namespace DiceHeist.Game
                 s.spatialBlend = 0f;
                 _voices[i] = s;
             }
+        }
+
+        AudioSource OneShotSource()
+        {
+            var s = gameObject.AddComponent<AudioSource>();
+            s.playOnAwake = false;
+            s.spatialBlend = 0f;
+            return s;
         }
 
         void OnDestroy()
@@ -100,12 +116,52 @@ namespace DiceHeist.Game
 
         void Update()
         {
+            // 녹음 소리를 멈출 때는 짧게 잦아들게
+            FadeOut(_pour, ref _pourFade);
+            FadeOut(_shake, ref _shakeFade);
+
             // 구르는 소리는 갑자기 끊기지 않게 부드럽게 따라간다
             if (_roll == null) return;
             float target = _rollTarget * Volume * 0.55f;
             _roll.volume = Mathf.MoveTowards(_roll.volume, target, Time.unscaledDeltaTime * 2.5f);
             if (_roll.volume > 0.001f && !_roll.isPlaying) _roll.Play();
             else if (_roll.volume <= 0.001f && _roll.isPlaying && _rollTarget <= 0f) _roll.Stop();
+        }
+
+        static void FadeOut(AudioSource s, ref float speed)
+        {
+            if (s == null || speed <= 0f || !s.isPlaying) return;
+            s.volume = Mathf.MoveTowards(s.volume, 0f, Time.unscaledDeltaTime * speed);
+            if (s.volume <= 0f)
+            {
+                s.Stop();
+                speed = 0f;
+            }
+        }
+
+        /// <summary>쏟아 구르는 녹음 소리(dice_pour)가 있는지. 있으면 DiceThrower가 부딪힘·구르기 합성음 대신 Pour를 쓴다.</summary>
+        public static bool HasPour => Instance._pourClip != null;
+        /// <summary>dice_pour에서 첫 번째 큰 부딪힘이 나는 시점(초). 물리의 첫 충돌에 이 시점을 맞춘다.</summary>
+        public const float PourFirstHit = 0.02f;
+
+        /// <summary>컵에서 쏟아 구르다 멈추는 소리를 처음부터 한 번 튼다. strength(0~1)는 던진 세기.</summary>
+        public static void Pour(float strength = 1f)
+        {
+            var a = Instance;
+            if (a._pourClip == null) return;
+            a._pourFade = 0f;
+            a._pour.Stop();
+            a._pour.clip = a._pourClip;
+            a._pour.pitch = Random.Range(0.95f, 1.06f);
+            a._pour.volume = Mathf.Lerp(0.6f, 1f, Mathf.Clamp01(strength)) * Volume;
+            a._pour.Play();
+        }
+
+        /// <summary>쏟는 소리를 짧게(seconds) 잦아들게 끝낸다. 주사위가 다 멈췄을 때 남은 꼬리를 정리한다.</summary>
+        public static void EndPour(float seconds = 0.35f)
+        {
+            var a = Instance;
+            if (a._pour != null && a._pour.isPlaying) a._pourFade = a._pour.volume / Mathf.Max(0.01f, seconds);
         }
 
         /// <summary>굴러가는 소리 크기(0~1). 0이면 잦아들며 멈춘다.</summary>
@@ -128,7 +184,25 @@ namespace DiceHeist.Game
         public static void CupRattle(float seconds, float volume = 0.6f)
         {
             var a = Instance;
+            if (a._shakeClip != null)
+            {
+                // 녹음한 흔들기: seconds만큼 틀고 잦아들게 끊는다(클립보다 길면 끝까지)
+                a._shakeFade = 0f;
+                a._shake.Stop();
+                a._shake.clip = a._shakeClip;
+                a._shake.pitch = Random.Range(0.96f, 1.06f);
+                a._shake.volume = Mathf.Clamp01(volume * 1.3f) * Volume;
+                a._shake.Play();
+                a.StartCoroutine(a.StopShakeAfter(seconds));
+                return;
+            }
             a.StartCoroutine(a.Rattle(seconds, volume));
+        }
+
+        IEnumerator StopShakeAfter(float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            if (_shake.isPlaying) _shakeFade = _shake.volume / 0.08f;
         }
 
         /// <summary>컵을 테이블에 탁 내려놓는 소리.</summary>

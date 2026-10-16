@@ -52,14 +52,36 @@ namespace DiceHeist.Game
             float t = 0f;
             int last = frames.Count - 1;
             int played = -1;
+
+            // 녹음한 쏟기 소리가 있으면 충돌마다 딸깍 대신 그것을 한 번 튼다. 녹음의 첫 부딪힘을 물리의 첫 충돌에 맞춘다
+            bool recorded = DiceAudio.HasPour;
+            float pourAt = 0f;
+            if (recorded)
+            {
+                int first = frames.FindIndex(fr => fr.Impacts != null);
+                pourAt = Mathf.Max(0f, (first < 0 ? 0 : first) * Step - DiceAudio.PourFirstHit);
+            }
+            bool poured = false;
+
             while (true)
             {
                 int f = Mathf.Min(last, Mathf.FloorToInt(t / Step));
-                for (int k = played + 1; k <= f; k++)
-                    if (frames[k].Impacts != null)
-                        foreach (float s in frames[k].Impacts) DiceAudio.Impact(s);
+                if (recorded)
+                {
+                    if (!poured && t >= pourAt)
+                    {
+                        DiceAudio.Pour(0.55f + 0.45f * dice.Count / 5f); // 적게 굴리면 조금 작게
+                        poured = true;
+                    }
+                }
+                else
+                {
+                    for (int k = played + 1; k <= f; k++)
+                        if (frames[k].Impacts != null)
+                            foreach (float s in frames[k].Impacts) DiceAudio.Impact(s);
+                    DiceAudio.SetRoll(frames[f].Roll);
+                }
                 played = f;
-                DiceAudio.SetRoll(frames[f].Roll);
                 for (int i = 0; i < dice.Count; i++)
                     dice[i].transform.SetPositionAndRotation(frames[f].Pos[i], frames[f].Rot[i]);
                 if (f == last) break;
@@ -67,6 +89,7 @@ namespace DiceHeist.Game
                 t += Time.deltaTime;
             }
             DiceAudio.SetRoll(0f);
+            if (recorded) DiceAudio.EndPour(); // 다 멈췄는데 녹음이 아직 구르면 짧게 잦아들게
             Physics.SyncTransforms();
         }
 
