@@ -16,6 +16,7 @@ namespace DiceHeist.Game
             public Vector3 RowCenter;
             public float RowSpacing;
             public Transform LabelAnchor;
+            public AnimalKind Kind;
         }
 
         public const float FloorY = -0.9f;
@@ -35,6 +36,10 @@ namespace DiceHeist.Game
         static readonly Vector2 ZoneHalf = new Vector2(2.3f, 1.15f);
 
         public readonly Seat[] Seats = new Seat[3];
+        /// <summary>테이블 머리(상대 둘 사이 뒤쪽)에 서 있는 딜러. 판에는 끼지 않는다.</summary>
+        public AnimalActor Dealer { get; private set; }
+        AnimalKind _dealerKind;
+        static readonly Vector3 DealerSpot = new Vector3(0f, FloorY, 6.3f);
         public Transform PotAnchor { get; private set; }
         Transform _potPile;
         int _potShown = -1;
@@ -92,7 +97,7 @@ namespace DiceHeist.Game
 
         Seat BuildSeat(int index, AnimalKind kind, Vector3 seatPos, bool mine)
         {
-            var seat = new Seat();
+            var seat = new Seat { Kind = kind };
             var animal = AnimalBuilder.Build(kind, transform);
             animal.Seat = seatPos;
             animal.transform.position = seatPos;
@@ -125,6 +130,47 @@ namespace DiceHeist.Game
                 Fx.Prim(PrimitiveType.Cylinder, seat.Cup, new Vector3(0, 0.05f, 0), new Vector3(1.12f, 0.05f, 1.12f), Gold, name: "Lip");
             }
             return seat;
+        }
+
+        /// <summary>Characters.Ids("fox" 등)를 AnimalKind로. 모르는 id면 fallback.</summary>
+        public static AnimalKind KindOf(string id, AnimalKind fallback) =>
+            !string.IsNullOrEmpty(id) && System.Enum.TryParse(id, true, out AnimalKind k) ? k : fallback;
+
+        /// <summary>
+        /// 테이블 등급에 맞춰 상대 동물과 딜러를 바꾼다(브론즈 너구리·고양이, 실버 여우·너구리, 골드 곰·여우, 딜러 펭귄).
+        /// 상대가 바뀌었으면 true(다시 등장 연출을 하라는 뜻). 겉모습만 바뀌고 주사위·컵·자리는 그대로다.
+        /// </summary>
+        public bool SetCast(string opp1, string opp2, string dealer)
+        {
+            bool changed = Swap(1, KindOf(opp1, AnimalKind.Raccoon)) | Swap(2, KindOf(opp2, AnimalKind.Cat));
+            var dk = KindOf(dealer, AnimalKind.Penguin);
+            if (Dealer == null || _dealerKind != dk)
+            {
+                if (Dealer != null) Destroy(Dealer.gameObject);
+                Dealer = AnimalBuilder.Build(dk, transform);
+                Dealer.Seat = DealerSpot;
+                Dealer.transform.position = DealerSpot;
+                Dealer.FaceTowards(new Vector3(0f, 0f, -4.5f));
+                Dealer.RememberFacing();
+                _dealerKind = dk;
+            }
+            return changed;
+        }
+
+        bool Swap(int index, AnimalKind kind)
+        {
+            var seat = Seats[index];
+            if (seat.Kind == kind) return false;
+            var old = seat.Animal;
+            var animal = AnimalBuilder.Build(kind, transform);
+            animal.Seat = old.Seat;
+            animal.transform.position = old.Seat;
+            animal.FaceTowards(Vector3.zero);
+            animal.RememberFacing();
+            seat.Animal = animal;
+            seat.Kind = kind;
+            Destroy(old.gameObject);
+            return true;
         }
 
         public Vector3 RowSlot(int seat, int i) =>

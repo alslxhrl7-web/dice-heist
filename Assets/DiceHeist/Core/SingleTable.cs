@@ -8,6 +8,8 @@ namespace DiceHeist.Core
     public sealed class SeatView
     {
         public string name;
+        /// <summary>동물(Characters.Ids). 사람 자리는 rabbit.</summary>
+        public string character;
         public string tag;
         public bool ai;
         public int chips;
@@ -59,6 +61,8 @@ namespace DiceHeist.Core
     {
         public string error;
         public string table;
+        /// <summary>판에 끼지 않고 테이블 머리에 서 있는 딜러 동물(Characters.Ids).</summary>
+        public string dealer;
         public int ante;
         public int raiseTotal;
         public int chipCap;
@@ -254,6 +258,7 @@ namespace DiceHeist.Core
                 seats[i] = new SeatView
                 {
                     name = p.Name,
+                    character = i == 0 ? "rabbit" : cfg.Cast[i - 1],
                     tag = p.Ai?.Tag,
                     ai = p.IsAi,
                     chips = p.Chips,
@@ -270,6 +275,7 @@ namespace DiceHeist.Core
             {
                 error = error,
                 table = cfg.Name,
+                dealer = cfg.Dealer,
                 ante = cfg.Ante,
                 raiseTotal = _g.RaiseTotal,
                 chipCap = cfg.ChipCap,

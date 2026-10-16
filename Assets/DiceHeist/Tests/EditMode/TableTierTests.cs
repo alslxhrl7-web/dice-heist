@@ -107,5 +107,22 @@ namespace DiceHeist.Tests
             HumanWinsRound(gold);
             Assert.AreEqual(2000, gold.Human.Chips);
         }
+        [Test]
+        public void 테이블마다_상대_동물과_딜러가_다르고_이름도_따라간다()
+        {
+            CollectionAssert.AreEqual(new[] { "raccoon", "cat" }, TableConfig.Bronze.Cast);
+            CollectionAssert.AreEqual(new[] { "fox", "raccoon" }, TableConfig.Silver.Cast);
+            CollectionAssert.AreEqual(new[] { "bear", "fox" }, TableConfig.Gold.Cast, "골드 보스는 곰");
+            foreach (var t in TableConfig.Tiers)
+            {
+                Assert.AreEqual("penguin", t.Dealer);
+                var v = new SingleTable(t, new SeededRandom(1), t.MinChips + t.Ante * 10).Look();
+                Assert.AreEqual("rabbit", v.seats[0].character);
+                Assert.AreEqual(t.Cast[0], v.seats[1].character);
+                Assert.AreEqual(Characters.NameOf(t.Cast[1]), v.seats[2].name);
+                Assert.AreEqual("penguin", v.dealer);
+                foreach (var id in t.Cast) Assert.IsTrue(Characters.IsValid(id), id);
+            }
+        }
     }
 }

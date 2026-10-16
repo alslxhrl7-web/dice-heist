@@ -73,7 +73,7 @@ namespace DiceHeist.Game
             card.gameObject.AddComponent<Image>().color = Card;
 
             Label(card, "다이스 하이스트", 84, Ink, 590, 104);
-            Label(card, "동물들이 주사위 5개로 포커 족보를 겨루는 베팅 게임 · 나(토끼) vs 너구리 · 고양이", 23, Muted, 548, 36);
+            Label(card, "동물들이 주사위 5개로 포커 족보를 겨루는 베팅 게임 · 나(토끼) vs 테이블마다 다른 상대 · 골드 보스는 곰", 23, Muted, 548, 36);
             Label(card, "굴리기  →  남기기(최대 2회)  →  베팅  →  쇼다운(공개)", 21, Muted, 514, 32);
             Label(card, "베팅: 폴드(포기) · 콜(따라가기) · 레이즈(올리기, 2~10배에서 고름)  ·  배수는 앤티 기준", 19, Muted, 484, 30);
             string who = _online ? $"<b>{_account}</b>  ·  " : "<color=#8b958f>오프라인</color>  ·  ";

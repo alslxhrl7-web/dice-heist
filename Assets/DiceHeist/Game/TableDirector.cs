@@ -93,6 +93,9 @@ namespace DiceHeist.Game
             {
                 _hud.SetTable($"{_v.table} 테이블 · {Ante} {_v.ante}칩 · 한도 {_v.chipCap:N0}칩" + (_backend.Online ? "" : " · 오프라인"));
                 Log($"{_v.table} 테이블에 앉았다 · {_v.seats[0].chips:N0}칩");
+                // 테이블 등급마다 상대 동물(브론즈 너구리·고양이, 실버 여우·너구리, 골드 보스 곰·여우)과 딜러(펭귄)가 다르다.
+                // 상대가 바뀌면 새 동물이 다시 걸어 나온다
+                if (_scene.SetCast(_v.seats[1].character, _v.seats[2].character, _v.dealer)) _entered = false;
                 Refresh();
 
                 if (!_entered)

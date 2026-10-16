@@ -31,6 +31,12 @@ namespace DiceHeist.Core
         /// 브론즈에서 AI가 너무 빨리 폴드해 팟이 작던 문제를 풀려고 넣었다.
         /// </summary>
         public double AiMisread;
+        /// <summary>
+        /// 이 테이블의 AI 두 자리에 앉는 동물(Characters.Ids)과 딜러. 겉모습과 이름만 바뀐다:
+        /// AI의 판단은 자리마다 정해진 성격(1번 너구리형 블러퍼, 2번 고양이형 계산가)과 위의 등급 값으로만 정해진다.
+        /// </summary>
+        public string[] Cast = { "raccoon", "cat" };
+        public string Dealer = "penguin";
 
         /// <summary>
         /// 입문 테이블. 사람도 AI도 500칩으로 시작하고, 사람은 1,000칩까지 벌 수 있다.
@@ -52,14 +58,14 @@ namespace DiceHeist.Core
         /// </summary>
         public static TableConfig Silver => new TableConfig
         {
-            Name = "실버", MinChips = 700, ChipCap = 1500, Ante = 20, AiStartChips = 1500,
+            Name = "실버", MinChips = 700, ChipCap = 1500, Ante = 20, AiStartChips = 1500, Cast = new[] { "fox", "raccoon" },
             AiMaxRerolls = 2, AiNerve = 0.5, AiMisread = 0.3,
         };
 
         /// <summary>1,000칩 이상 가지고 있어야 입장, 2,000칩까지. AI는 제 실력(웹 프로토타입과 같은 판단).</summary>
         public static TableConfig Gold => new TableConfig
         {
-            Name = "골드", MinChips = 1000, ChipCap = 2000, Ante = 30, AiStartChips = 2000,
+            Name = "골드", MinChips = 1000, ChipCap = 2000, Ante = 30, AiStartChips = 2000, Cast = new[] { "bear", "fox" }, // 곰이 보스
             AiMaxRerolls = 2, AiNerve = 1.0,
         };
 
@@ -117,14 +123,14 @@ namespace DiceHeist.Core
 
         int _humanChipsAtStart;
 
-        /// <summary>싱글: 나 + AI 너구리·고양이.</summary>
+        /// <summary>싱글: 나 + AI 둘(테이블 등급의 Cast: 브론즈 너구리·고양이, 실버 여우·너구리, 골드 곰·여우).</summary>
         /// <param name="humanChips">사람이 가지고 앉는 칩. 음수면 cfg.StartChips(처음 시작).</param>
         public DiceGame(TableConfig cfg, IRandom rng, int humanChips = -1)
             : this(cfg, rng, new[]
             {
                 new Seat("me", "나", humanChips >= 0 ? humanChips : cfg.StartChips, null),
-                new Seat("rac", "너구리", cfg.AiStartChips, AiProfile.Raccoon),
-                new Seat("cat", "고양이", cfg.AiStartChips, AiProfile.Cat),
+                new Seat("rac", Characters.NameOf(cfg.Cast[0]), cfg.AiStartChips, AiProfile.Raccoon),
+                new Seat("cat", Characters.NameOf(cfg.Cast[1]), cfg.AiStartChips, AiProfile.Cat),
             })
         {
         }
