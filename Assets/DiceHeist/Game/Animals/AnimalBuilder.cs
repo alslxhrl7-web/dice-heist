@@ -7,6 +7,10 @@ namespace DiceHeist.Game
         Rabbit,
         Raccoon,
         Cat,
+        // 아래 셋은 싱글 단계의 보스·딜러용(아직 자리에 쓰지 않음). 3D 모델만 있고, 모델이 없으면 고양이 모양 도형으로 나온다
+        Fox,
+        Bear,
+        Penguin,
     }
 
     /// <summary>기본 도형을 조립한 2~3등신 동물. 나중에 모델로 바꿀 때는 이 클래스만 갈아 끼우면 된다.</summary>

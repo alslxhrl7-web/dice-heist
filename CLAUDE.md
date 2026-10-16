@@ -34,6 +34,7 @@ Assets/DiceHeist/
 - **Core**: `HandEvaluator`(족보·동점), `AiBrain`(홀드·베팅), `BettingRound`, `DiceGame`(한 판 진행), `SeededRandom`(SplitMix64). 호출 순서는 StartRound → Reroll → BeginBetting → Betting.Apply → ResolveShowdown
 - **SingleTable**(Core): 싱글 한 테이블을 요청 단위(Start → Reroll → Stand → Bet → result)로 진행하고 `SingleView`(상태 + 이벤트 목록)를 돌려준다. 서버와 Unity 오프라인이 같은 코드를 쓴다. AI 주사위는 쇼다운 공개 전까지 넣지 않는다. 필드만 쓰는 이유는 Unity JsonUtility로 서버 JSON을 읽기 위해서다
 - **Unity 흐름**: 로그인(`LoginScreen`, 토큰은 PlayerPrefs `DiceHeist.Token`) → 시작 화면 → `TableDirector`가 `ISingleBackend`(서버 `RemoteBackend` / 이 PC `LocalBackend`)에 요청하고 돌아온 이벤트를 연출. 서버 주소는 `GameBootstrap.serverUrl`. "서버 없이 연습"과 테스트는 LocalBackend(PlayerPrefs 저장, 멀티 불가)
+- **캐릭터 에셋**(2026-10-16, VARCO 3D "포커다이스" 흐름에서 생성): 그림 `Assets/Art/Characters/*.png`(Sprite, 숲 배경, rabbit이 화풍 기준), 3D `Assets/Art/Characters/3D/Resources/Characters3D/<동물>.glb`(glTFast `com.unity.cloud.gltfast`로 가져옴). `AnimalBuilder`가 이 폴더에 모델이 있으면 도형 렌더러를 끄고 모델을 Body에 붙여 키 2.4·바닥 0에 맞춘다(피벗과 연출은 그대로, 모델이 없으면 도형). 3D는 VARCO 결과를 Blender(백그라운드)로 텍스처 1024 JPEG로 줄였고 토끼는 발밑 풀밭을 잘라 냈다. 숲 배경 그림을 그대로 3D로 만들면 배경째 판이 되거나 실패해서, 배경을 흰색으로 바꾼 그림(EditImage)으로 다시 만들었다. fox·bear·penguin은 싱글 보스·딜러용으로 `AnimalKind`에만 있다
 - **Game**: `GameBootstrap`이 실행 시 테이블·동물·UI를 전부 코드로 조립한다. `TableDirector`가 Core를 한 단계씩 진행시키며 연출과 입력 대기를 끼운다
 - 주사위 눈은 Core가 먼저 정한다. `DiceThrower`는 물리를 미리 돌려 녹화하고, 멈춘 윗면에 정해진 눈을 입혀 재생한다. 연출용 난수는 게임 난수를 소비하지 않는다
 - 상대 주사위는 컵 안에 있어 공개 전까지 보이지 않고 리롤 횟수만 표시한다
