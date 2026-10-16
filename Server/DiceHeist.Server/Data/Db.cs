@@ -188,6 +188,18 @@ CREATE TABLE IF NOT EXISTS ledger (
             return v == null ? null : (long)v;
         }
 
+        /// <summary>비밀번호를 바꾸고, keepToken(지금 쓰는 기기)만 남기고 다른 로그인은 모두 끊는다.</summary>
+        public void ChangePassword(long userId, string password, string keepToken)
+        {
+            var salt = RandomNumberGenerator.GetBytes(16);
+            var hash = Passwords.Hash(password, salt);
+            using var c = Open();
+            using var tx = c.BeginTransaction();
+            Exec(c, tx, "UPDATE users SET pw_hash = $h, pw_salt = $s WHERE id = $u", ("$h", hash), ("$s", salt), ("$u", userId));
+            Exec(c, tx, "DELETE FROM sessions WHERE user_id = $u AND token <> $t", ("$u", userId), ("$t", keepToken));
+            tx.Commit();
+        }
+
         /// <summary>기한이 지난 로그인 토큰을 지운다. 지운 수.</summary>
         public int DeleteExpiredSessions(DateTimeOffset now)
         {

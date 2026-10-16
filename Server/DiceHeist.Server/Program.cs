@@ -118,6 +118,24 @@ app.MapPost("/api/logout", (HttpRequest req) =>
     return Results.Ok();
 });
 
+app.MapPost("/api/password", (HttpRequest req, PasswordChange p) =>
+{
+    if (Auth(req) is not long uid) return Results.Unauthorized();
+    var name = db.GetUser(uid).Name;
+    if (guard.LockedFor(name) is TimeSpan wait)
+        return Results.Json(new { error = $"비밀번호를 여러 번 틀려 잠시 잠겼습니다. {LoginGuard.Minutes(wait)} 뒤에 다시 시도해 주세요." },
+            statusCode: StatusCodes.Status429TooManyRequests);
+    if (p?.Current == null || db.VerifyUser(name, p.Current) != uid)
+    {
+        guard.Failed(name);
+        return Results.BadRequest(new { error = "지금 비밀번호가 맞지 않습니다." });
+    }
+    if (p.Next == null || p.Next.Length < 6 || p.Next.Length > 64) return Results.BadRequest(new { error = "새 비밀번호는 6~64자입니다." });
+    db.ChangePassword(uid, p.Next, req.Headers.Authorization.ToString().Substring("Bearer ".Length));
+    guard.Succeeded(name);
+    return Profile(uid);
+});
+
 app.MapGet("/api/me", (HttpRequest req) => Auth(req) is long uid ? Profile(uid) : Results.Unauthorized());
 
 // ---------- 싱글 (Unity가 부른다). 판정은 서버의 Core가 하고, 칩은 요청마다 저장한다 ----------
@@ -195,6 +213,7 @@ app.Run();
 
 public sealed record Credentials(string Name, string Password);
 public sealed record ExchangeRequest(int Amount);
+public sealed record PasswordChange(string Current, string Next);
 public sealed record SitRequest(string Table);
 public sealed record RerollRequest(bool[] Held);
 /// <param name="RaiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기. 허용 범위 밖이면 Core가 맞춘다</param>

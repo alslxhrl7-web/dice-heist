@@ -173,6 +173,15 @@ $('exchangeBtn').addEventListener('click', async () => {
   try { profile = await api('/api/exchange', { amount: profile.exchangeUnit }); render(); }
   catch (err) { showError(err.message); }
 });
+$('pwForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    profile = await api('/api/password', { current: $('pwCurrent').value, next: $('pwNext').value });
+    $('pwForm').reset();
+    $('pwNote').textContent = '비밀번호를 바꿨습니다. 다른 곳의 로그인은 끊겼습니다.';
+    render();
+  } catch (err) { $('pwNote').textContent = err.message; }
+});
 $('rescueBtn').addEventListener('click', async () => {
   try { profile = await api('/api/rescue', {}); render(); }
   catch (err) { showError(err.message); }
