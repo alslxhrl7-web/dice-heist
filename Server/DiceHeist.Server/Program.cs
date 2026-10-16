@@ -35,6 +35,13 @@ builder.Services.AddSingleton<HubNotifier>();
 builder.Services.AddHostedService<RoomTicker>();
 builder.Services.AddHostedService<DbBackup>();
 builder.Services.AddSingleton<SingleSessions>();
+var security = builder.Configuration.GetSection("Security");
+builder.Services.AddSingleton(new LoginGuard
+{
+    MaxFailures = security.GetValue("LoginFailures", 5),
+    Window = TimeSpan.FromMinutes(security.GetValue("LockMinutes", 15.0)),
+    RegistrationsPerHour = security.GetValue("RegistrationsPerHour", 20),
+});
 builder.Services.AddSignalR();
 // SingleView 같은 Core의 화면용 클래스는 필드로 되어 있어(Unity JsonUtility와 같이 쓰려고) 필드도 JSON에 넣는다
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.IncludeFields = true);
@@ -42,6 +49,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.IncludeFields
 var app = builder.Build();
 
 var db = app.Services.GetRequiredService<Db>();
+var guard = app.Services.GetRequiredService<LoginGuard>();
 var rooms = app.Services.GetRequiredService<RoomManager>();
 rooms.SetNotifier(app.Services.GetRequiredService<HubNotifier>());
 int refunded = db.RefundAllStacks();
@@ -72,6 +80,10 @@ app.MapPost("/api/register", (Credentials c) =>
     if (name == null || !namePattern.IsMatch(name))
         return Results.BadRequest(new { error = "아이디는 한글·영문·숫자·_ 를 섞어 2~12자로 정해 주세요. (띄어쓰기·특수문자 불가)" });
     if (c.Password == null || c.Password.Length < 6 || c.Password.Length > 64) return Results.BadRequest(new { error = "비밀번호는 6~64자입니다." });
+    if (db.NameExists(name)) return Results.BadRequest(new { error = "이미 있는 아이디입니다." });
+    // 가입마다 시작 머니를 주므로 계정을 마구 만들지 못하게 서버 전체에서 시간당 횟수를 센다
+    if (!guard.TryRegister())
+        return Results.Json(new { error = "지금은 가입이 몰려 잠시 막혀 있습니다. 조금 뒤에 다시 시도해 주세요." }, statusCode: StatusCodes.Status429TooManyRequests);
     var uid = db.CreateUser(name, c.Password);
     if (uid == null) return Results.BadRequest(new { error = "이미 있는 아이디입니다." });
     return Results.Ok(new { token = db.CreateSession(uid.Value), profile = Profiles.Of(db.GetUser(uid.Value), false) });
@@ -80,7 +92,14 @@ app.MapPost("/api/register", (Credentials c) =>
 app.MapPost("/api/login", (Credentials c) =>
 {
     var name = CleanName(c?.Name);
+    // 비밀번호를 계속 틀린 아이디는 잠시 막는다. 잠긴 동안은 비밀번호를 확인하지 않는다(맞혀도 들어오지 못한다)
+    if (name != null && guard.LockedFor(name) is TimeSpan wait)
+        return Results.Json(new { error = $"비밀번호를 여러 번 틀려 이 아이디는 잠시 잠겼습니다. {LoginGuard.Minutes(wait)} 뒤에 다시 시도해 주세요." },
+            statusCode: StatusCodes.Status429TooManyRequests);
     var uid = name == null || c.Password == null ? null : db.VerifyUser(name, c.Password);
+    // 있는 아이디만 센다(없는 아이디는 지킬 것이 없고, 세면 아무 이름으로 메모리를 채울 수 있다)
+    if (uid == null && name != null && db.NameExists(name)) guard.Failed(name);
+    if (uid != null) guard.Succeeded(name);
     // 친구끼리 쓰는 규모라, 무엇이 틀렸는지 알려 주는 편이 낫다(없는 아이디 / 틀린 비밀번호)
     if (uid == null)
         return Results.BadRequest(new
