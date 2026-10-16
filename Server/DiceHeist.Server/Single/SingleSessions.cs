@@ -47,7 +47,7 @@ namespace DiceHeist.Server.Single
         public SingleView Rescue(long userId) => Do(userId, t => t.Rescue());
         public SingleView Reroll(long userId, bool[] held) => Do(userId, t => t.Reroll(held));
         public SingleView Stand(long userId) => Do(userId, t => t.Stand());
-        public SingleView Bet(long userId, string action) => Do(userId, t => t.Bet(action));
+        public SingleView Bet(long userId, string action, int raiseTo = 0) => Do(userId, t => t.Bet(action, raiseTo));
 
         SingleView Do(long userId, Func<SingleTable, SingleView> action)
         {

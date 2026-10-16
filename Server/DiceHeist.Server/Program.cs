@@ -112,7 +112,7 @@ app.MapPost("/api/single/start", (HttpRequest req) => Single(req, single.Start))
 app.MapPost("/api/single/rescue", (HttpRequest req) => Single(req, single.Rescue));
 app.MapPost("/api/single/reroll", (HttpRequest req, RerollRequest r) => Single(req, uid => single.Reroll(uid, r?.Held)));
 app.MapPost("/api/single/stand", (HttpRequest req) => Single(req, single.Stand));
-app.MapPost("/api/single/bet", (HttpRequest req, BetRequest b) => Single(req, uid => single.Bet(uid, b?.Action)));
+app.MapPost("/api/single/bet", (HttpRequest req, BetRequest b) => Single(req, uid => single.Bet(uid, b?.Action, b?.RaiseTo ?? 0)));
 app.MapPost("/api/single/leave", (HttpRequest req) => Single(req, single.Leave));
 
 app.MapPost("/api/exchange", (HttpRequest req, ExchangeRequest e) =>
@@ -146,6 +146,7 @@ public sealed record Credentials(string Name, string Password);
 public sealed record ExchangeRequest(int Amount);
 public sealed record SitRequest(string Table);
 public sealed record RerollRequest(bool[] Held);
-public sealed record BetRequest(string Action);
+/// <param name="RaiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기. 허용 범위 밖이면 Core가 맞춘다</param>
+public sealed record BetRequest(string Action, int RaiseTo = 0);
 
 public partial class Program { }
