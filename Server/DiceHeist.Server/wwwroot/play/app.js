@@ -217,6 +217,12 @@ $('pwForm').addEventListener('submit', async e => {
     render();
   } catch (err) { $('pwNote').textContent = err.message; }
 });
+$('charPick').addEventListener('click', async e => {
+  const b = e.target.closest('[data-char]');
+  if (!b || b.dataset.char === profile.character) return;
+  try { profile = await api('/api/character', { character: b.dataset.char }); rankingAt = 0; render(); }
+  catch (err) { showError(err.message); }
+});
 $('rescueBtn').addEventListener('click', async () => {
   try { profile = await api('/api/rescue', {}); render(); }
   catch (err) { showError(err.message); }
@@ -283,7 +289,7 @@ function render() {
   $('game').hidden = !loggedIn || !state;
 
   $('stats').innerHTML = loggedIn ? [
-    ['계정', esc(profile.name)], ['싱글 칩', fmt(profile.chips)], ['사이버머니', fmt(profile.money)],
+    ['계정', `<span class="who">${Animals.face(profile.character, 'avatar sm')}${esc(profile.name)}</span>`], ['싱글 칩', fmt(profile.chips)], ['사이버머니', fmt(profile.money)],
   ].map(([k, v]) => `<div class="stat"><span>${k}</span><b class="num">${v}</b></div>`).join('') : '';
   if (!state && attentionText) attention(null);
   if (!loggedIn) return;
@@ -307,6 +313,12 @@ function renderLobby() {
       ? ' 지금은 사이버머니가 모자랍니다. [구제 머니 받기]로 채우거나, PC 게임(싱글)에서 칩을 벌어 환전하세요.'
       : ' 지금은 사이버머니가 모자랍니다. 구제 머니는 하루 한 번이라 내일(한국 시간 자정 뒤) 다시 받을 수 있고, PC 게임(싱글)에서 칩을 벌어 환전해도 됩니다.');
   $('createForm').querySelector('button').disabled = !canPlay;
+
+  // 내 캐릭터 고르기(겉모습만). 한 번만 만들고, 고른 것만 표시를 바꾼다
+  const pick = $('charPick');
+  if (!pick.childElementCount)
+    pick.innerHTML = Animals.ids.map(id => `<button type="button" data-char="${id}" aria-pressed="false">${Animals.face(id, 'avatar lg')}${Animals.name(id)}</button>`).join('');
+  pick.querySelectorAll('[data-char]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.char === profile.character)));
 
   const rec = profile.record;
   $('record').innerHTML = !rec ? '' : [
@@ -339,7 +351,7 @@ async function loadRanking() {
 function renderRanking() {
   $('ranking').innerHTML = ranking.length ? ranking.map(r => `
     <li class="${profile && r.name === profile.name ? 'me' : ''}"><span class="no num">${r.rank}</span>
-      <span class="who">${esc(r.name)}</span><span class="num">${fmt(r.money)}</span></li>`).join('')
+      <span class="who">${Animals.face(r.character, 'avatar sm')} ${esc(r.name)}</span><span class="num">${fmt(r.money)}</span></li>`).join('')
     : '<li class="note">아직 아무도 없습니다.</li>';
 }
 
@@ -356,7 +368,7 @@ function renderGame() {
 
   $('opps').innerHTML = s.seats.map((p, i) => i === s.mySeat ? '' : `
     <div class="opp ${p.turn ? 'turn' : ''} ${p.folded || !p.connected ? 'out' : ''} ${p.winner ? 'win' : ''}">${bubble(p)}
-      <div class="top"><strong>${esc(p.name)}</strong>
+      <div class="top">${Animals.face(p.character, 'avatar lg')}<strong>${esc(p.name)}</strong>
         <span class="num">${fmt(p.stack)}</span>
         ${p.starter ? '<span class="pill first">선</span>' : ''}
         ${!p.connected ? '<span class="pill">연결 끊김</span>' : p.leaving ? '<span class="pill">나가는 중</span>' : ''}</div>
@@ -415,7 +427,7 @@ function renderGame() {
   const meEl = $('me');
   meEl.className = 'me' + ((holding || me?.myTurn) ? ' turn' : '') + (mine?.winner ? ' win' : '');
   meEl.innerHTML = `${bubble(mine)}
-    <div class="top"><strong>${esc(mine?.name)} (나)</strong><span class="num">${fmt(mine?.stack ?? 0)}</span>
+    <div class="top">${mine ? Animals.face(mine.character, 'avatar lg') : ''}<strong>${esc(mine?.name)} (나)</strong><span class="num">${fmt(mine?.stack ?? 0)}</span>
       ${mine?.starter ? '<span class="pill first">선</span>' : ''}
       ${mine ? `<span class="pill">리롤 ${mine.rerolls}회</span>${statusPill(mine)}` : ''}</div>
     ${dice ? `<div class="dice">${dice.map((v, i) => `<button class="die ${held[i] ? 'held' : ''}" data-die="${i}"

@@ -72,6 +72,8 @@ const Animals = (() => {
   return {
     ids: Object.keys(NAMES),
     name: id => NAMES[id] || NAMES.rabbit,
+    /** 얼굴 그림(HTML). cls로 크기를 정한다(avatar 등). */
+    face(id, cls = 'avatar') { return `<span class="${cls}">${this.svg(id)}</span>`; },
     /** 얼굴 SVG 문자열. 모르는 id면 토끼. */
     svg(id, label) {
       const k = draw[id] ? id : 'rabbit';

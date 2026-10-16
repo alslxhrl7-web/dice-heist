@@ -118,6 +118,17 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
 .record{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .record .stat{background:var(--bg)}
 .account{margin-top:12px}
+.avatar{display:inline-block;width:34px;height:34px;flex:none;vertical-align:middle}
+.avatar.lg{width:46px;height:46px}
+.avatar.sm{width:24px;height:24px}
+.avatar svg,.avatar img{display:block;width:100%;height:100%;object-fit:contain}
+.top .avatar{align-self:center}
+.pick{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.pick-list{display:flex;flex-wrap:wrap;gap:8px}
+.pick-list button{background:var(--bg);border:3px solid transparent;border-radius:16px;padding:4px 8px 2px;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;align-items:center;font-size:.8rem}
+.pick-list button[aria-pressed="true"]{border-color:var(--accent)}
+.pick-list button:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.stat .who{display:flex;align-items:center;gap:6px}
 .account summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .account form{margin-top:8px}
 .netbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--bad);color:var(--card);font-family:var(--display)}
@@ -172,6 +183,10 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
         <button class="btn primary" type="submit">방 만들기</button>
       </form>
       <div class="record" id="record" aria-label="내 기록"></div>
+      <div class="pick" role="group" aria-label="내 캐릭터">
+        <span class="note">내 캐릭터</span>
+        <div class="pick-list" id="charPick"></div>
+      </div>
       <details class="account">
         <summary>비밀번호 바꾸기</summary>
         <form class="row" id="pwForm">
@@ -225,6 +240,7 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script src="/animals.js"></script>
 <script src="sound.js"></script>
 <script src="app.js"></script>
 </body>
