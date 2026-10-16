@@ -11,11 +11,13 @@
 나(토끼) + AI 너구리·고양이가 브론즈 테이블(참가비 10칩)에서 한 판을 끝까지 한다.
 굴리기 → 남기기(최대 2회) → 걸기(포기 / 따라가기 / 올리기) → 공개.
 
-- 확인됨: EditMode 테스트 108개(.NET으로 실행), 서버 테스트 35개, PlayMode 자동 진행 테스트, Windows 실행 파일에서 주사위 클릭 고정과 다시 굴리기
+- 확인됨: EditMode 테스트 108개(.NET으로 실행), 서버 테스트 38개, PlayMode 자동 진행 테스트, Windows 실행 파일에서 주사위 클릭 고정과 다시 굴리기
 - 직접 눌러 확인하지 못함: 베팅 버튼과 공개 단계의 마우스 조작(자동 진행 테스트로만 확인)
 - 임시 수준: 화면 톤(조명·색), 동물 모델(기본 도형 조립)
 
-다음 할 일: 사이트 구성. 소개 페이지인지 WebGL 플레이인지는 아직 정하지 않았다.
+사이트(2026-10-16, 사용자 결정: WebGL 대신 소개 페이지): `/`는 소개 페이지(한 판의 흐름·족보·싱글/멀티·자주 묻는 것), 멀티 화면은 `/play/`. PC 게임 zip은 `/download/windows`(파일이 없으면 버튼이 숨는다). Unity 시작 화면의 멀티 카드도 `/play/`를 연다.
+
+다음 할 일: 정하지 않았다.
 
 ## 구조
 
@@ -40,7 +42,7 @@ Assets/DiceHeist/
 
 ## 멀티 서버 (Server/, 2026-10-14 1단계)
 
-C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일). 주사위 눈은 SVG로 그린다(CSS 그리드는 `<button>` 안에서 칸이 0으로 접혀 눈이 안 보였다). 족보 표는 `/api/config`의 hands(RankWeights 확률)로 그린다. 로컬 미리보기 서버는 5090 포트(5080은 서비스가 씀)
+C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일): `index.html` 소개 페이지, `play/` 멀티 화면. 소개 페이지는 `/api/config`(족보·테이블 등급·멀티 규칙)와 `/api/site`(열린 방 수·앉은 사람 수·zip 크기)를 읽는다. zip 위치는 설정 `Site:WindowsZip`(기본: 실행 파일 옆 `downloads/DiceHeist-Windows.zip`), 서비스 설치 스크립트가 `Builds/DiceHeist-Windows.zip`을 `C:\DiceHeist\downloads`로 복사한다. 주사위 눈은 SVG로 그린다(CSS 그리드는 `<button>` 안에서 칸이 0으로 접혀 눈이 안 보였다). 족보 표는 `/api/config`의 hands(RankWeights 확률)로 그린다. 로컬 미리보기 서버는 5090 포트(5080은 서비스가 씀)
 
 - 계정(PBKDF2 비밀번호, 30일 토큰), 칩·사이버머니는 서버 DB(`Server/DiceHeist.Server/dice-heist.db`, git 제외)
 - 방마다 최대 6명(방 수는 제한 없음, 2명부터 시작), 앤티 1,000, 바이인 50,000(머니 → 테이블 stack, 일어나면 돌려받음). 서버가 꺼졌다 켜지면 남은 stack을 돌려준다

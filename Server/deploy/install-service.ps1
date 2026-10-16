@@ -25,11 +25,18 @@ dotnet publish $project -c Release -o $app --nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "빌드 실패" }
 
 New-Item -ItemType Directory -Force $data | Out-Null
+# 소개 페이지의 "PC 게임 받기": Unity Windows 빌드가 만든 zip이 있으면 함께 올린다(없으면 버튼이 숨는다)
+$downloads = Join-Path $Root "downloads"
+$zip = Join-Path $PSScriptRoot "..\..\Builds\DiceHeist-Windows.zip"
+New-Item -ItemType Directory -Force $downloads | Out-Null
+if (Test-Path $zip) { Copy-Item $zip $downloads -Force; Write-Host "PC 게임 zip을 올렸습니다." }
+else { Write-Host "PC 게임 zip이 없어 내려받기 버튼은 숨겨집니다. (Unity 메뉴 DiceHeist → Windows 빌드 후 다시 실행)" }
 # 운영 설정: 이 PC 안(localhost)에서만 받고, 밖에서는 터널(Tailscale Funnel)로만 들어온다
 @{
     Urls = "http://localhost:$Port"
     Db   = @{ Path = (Join-Path $data "dice-heist.db"); BackupDir = (Join-Path $data "backups"); BackupKeep = 7 }
     Dev  = @{ AllowGrant = $AllowGrant; GrantMoney = 100000 }
+    Site = @{ WindowsZip = (Join-Path $downloads "DiceHeist-Windows.zip") }
 } | ConvertTo-Json -Depth 3 | Set-Content (Join-Path $app "appsettings.Production.json") -Encoding UTF8
 
 if (-not $svc) {

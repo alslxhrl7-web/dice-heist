@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File .\Server\deploy\install-service.ps1
 
 ### 1-5. 잘 됐는지 확인
 
-1. **브라우저로 확인:** 크롬이나 엣지 주소창에 `http://localhost:5080` 을 치고 Enter. "다이스 하이스트 · 멀티" 로그인 화면이 나오면 성공입니다.
+1. **브라우저로 확인:** 크롬이나 엣지 주소창에 `http://localhost:5080` 을 치고 Enter. "다이스 하이스트" 소개 페이지가 나오고, **브라우저로 멀티 하기**를 눌러 로그인 화면(`/play/`)이 나오면 성공입니다.
 2. **서비스 목록에서 확인:**
    1. Windows 키를 누르고 `서비스`라고 쳐서 나오는 **서비스** 앱을 엽니다.
    2. 목록에서 **Dice Heist 멀티 서버**를 찾습니다(이름순 정렬이라 D 근처).
@@ -91,6 +91,8 @@ powershell -ExecutionPolicy Bypass -File .\Server\deploy\install-service.ps1
 3. 마지막에 "(테스트 머니 버튼: False)"가 보이고 "계속하려면 아무 키나 누르십시오"가 나오면 끝입니다. 아무 키나 눌러 창을 닫습니다.
 4. 사이트를 **Ctrl+F5**로 새로고침해 바뀐 것을 확인합니다.
 
+**PC 게임 내려받기 올리기:** Unity 메뉴 **DiceHeist → Windows 빌드**로 `Builds\DiceHeist-Windows.zip`을 만든 뒤 위처럼 업데이트하면, 스크립트가 그 zip을 `C:\DiceHeist\downloads`로 복사하고 소개 페이지에 **PC 게임 받기** 버튼이 나타납니다. zip이 없으면 버튼은 숨겨지고 "준비 중"으로 나옵니다.
+
 **직접 하는 방법:** 1-2(관리자 PowerShell 열기) → 1-3(폴더 이동) → 1-4(같은 명령 실행)를 그대로 다시 하면 됩니다.
 
 어느 쪽이든 서비스를 멈추고, 새로 빌드하고, 다시 켭니다. 계정·사이버머니가 든 DB는 지워지지 않습니다. 업데이트하는 1~2분 동안만 사이트가 꺼지고, 그때 멀티 테이블에 앉아 있던 사람의 stack은 서버가 다시 켜질 때 머니로 돌려줍니다.
@@ -114,6 +116,7 @@ powershell -ExecutionPolicy Bypass -File .\Server\deploy\install-service.ps1
 | `C:\DiceHeist\server` | 서버 프로그램 (새 버전 설치 때마다 덮어씀) |
 | `C:\DiceHeist\data\dice-heist.db` | 계정·칩·사이버머니. **이 파일이 가장 중요합니다** |
 | `C:\DiceHeist\data\backups` | DB 사본. 서버가 켜질 때와 하루에 한 번 만들고 최근 7개만 남김 |
+| `C:\DiceHeist\downloads` | 소개 페이지에서 내려주는 PC 게임 zip (업데이트 때마다 `Builds`에서 복사) |
 
 ---
 
