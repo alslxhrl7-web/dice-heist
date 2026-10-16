@@ -42,7 +42,7 @@ Assets/DiceHeist/
 
 ## 멀티 서버 (Server/, 2026-10-14 1단계)
 
-C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일): `index.html` 소개 페이지, `play/` 멀티 화면. 소개 페이지는 `/api/config`(족보·테이블 등급·멀티 규칙)와 `/api/site`(열린 방 수·앉은 사람 수·zip 크기)를 읽는다. zip 위치는 설정 `Site:WindowsZip`(기본: 실행 파일 옆 `downloads/DiceHeist-Windows.zip`), 서비스 설치 스크립트가 `Builds/DiceHeist-Windows.zip`을 `C:\DiceHeist\downloads`로 복사한다. 주사위 눈은 SVG로 그린다(CSS 그리드는 `<button>` 안에서 칸이 0으로 접혀 눈이 안 보였다). 족보 표는 `/api/config`의 hands(RankWeights 확률)로 그린다. 로컬 미리보기 서버는 5090 포트(5080은 서비스가 씀)
+C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일): `index.html` 소개 페이지, `play/` 멀티 화면. 소개 페이지는 `/api/config`(족보·테이블 등급·멀티 규칙)와 `/api/site`(열린 방 수·앉은 사람 수·zip 크기)를 읽는다. zip 위치는 설정 `Site:WindowsZip`(기본: 실행 파일 옆 `downloads/DiceHeist-Windows.zip`), 서비스 설치 스크립트가 `Builds/DiceHeist-Windows.zip`을 `C:\DiceHeist\downloads`로 복사한다. 주사위 눈은 SVG로 그린다(CSS 그리드는 `<button>` 안에서 칸이 0으로 접혀 눈이 안 보였다). 멀티 화면 효과음은 `play/sound.js`가 WebAudio로 합성한다(굴림·칩·폴드·공개·승패·내 차례, 음소거는 localStorage `dh.mute`). 상태가 바뀔 때 `cue`가 바로 전 상태와 비교해 소리를 고르고, 다른 탭을 보는 중에 내 차례면 탭 제목을 깜빡인다. 로비와 소개 페이지에 순위표(`/api/ranking`, 머니 + 테이블 stack 상위 10명) 족보 표는 `/api/config`의 hands(RankWeights 확률)로 그린다. 로컬 미리보기 서버는 5090 포트(5080은 서비스가 씀)
 
 - 계정(PBKDF2 비밀번호, 30일 토큰), 칩·사이버머니는 서버 DB(`Server/DiceHeist.Server/dice-heist.db`, git 제외)
 - 로그인 보호(`LoginGuard`, 메모리): 있는 아이디로 15분 안에 비밀번호를 5번 틀리면 그 아이디를 잠시 잠근다(429). 가입은 서버 전체에서 시간당 20개(시작 머니를 노린 계정 찍어내기 방지). Funnel 뒤라 접속 주소가 모두 localhost로 보여 주소 대신 아이디·서버 전체로 센다. 값은 설정 `Security:LoginFailures`·`LockMinutes`·`RegistrationsPerHour`
