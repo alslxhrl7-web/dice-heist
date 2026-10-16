@@ -44,3 +44,6 @@ Server/**/obj/
 
 # 위의 *.csproj는 Unity가 만드는 프로젝트 파일용. 서버(.NET) 프로젝트 파일은 저장소에 넣는다
 !Server/**/*.csproj
+
+# 서버가 내려주는 PC 게임 zip (개발 미리보기용)
+/Server/DiceHeist.Server/downloads/

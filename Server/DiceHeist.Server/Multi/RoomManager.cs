@@ -46,6 +46,12 @@ namespace DiceHeist.Server.Multi
 
         object[] LobbyUnlocked() => _rooms.Values.OrderBy(r => r.Id).Select(r => r.Summary()).ToArray();
 
+        /// <summary>소개 페이지에 보여 줄 숫자: 열린 방 수와 앉아 있는 사람 수.</summary>
+        public (int rooms, int players) Counts()
+        {
+            lock (_gate) return (_rooms.Count, _rooms.Values.Sum(r => r.Seats.Count));
+        }
+
         public bool IsInRoom(long userId)
         {
             lock (_gate) return RoomOf(userId) != null;

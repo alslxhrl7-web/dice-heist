@@ -89,6 +89,35 @@ namespace DiceHeist.Server.Tests
         }
 
         [Test]
+        public async Task 레이즈_크기를_보내면_그_크기로_올라간다()
+        {
+            await Post("/api/single/sit", new { table = "브론즈" });
+            for (int round = 0; round < 30; round++)
+            {
+                var v = await Post("/api/single/start");
+                if (Phase(v) == "broke") { await Post("/api/single/rescue"); v = await Post("/api/single/start"); }
+                v = await Post("/api/single/stand");
+                while (Phase(v) == "bet" && !v.GetProperty("canRaise").GetBoolean())
+                    v = await Post("/api/single/bet", new { action = v.GetProperty("canCall").GetBoolean() ? "call" : "fold" });
+                if (Phase(v) != "bet") continue;
+
+                int ante = v.GetProperty("ante").GetInt32();
+                int max = v.GetProperty("maxRaise").GetInt32();
+                int before = v.GetProperty("seats")[0].GetProperty("contrib").GetInt32();
+                int raiseTo = Math.Min(max, ante * 8);
+                Assert.Greater(raiseTo, v.GetProperty("raiseTotal").GetInt32(), "기본 크기보다 크게 올려 본다");
+
+                v = await Post("/api/single/bet", new { action = "raise", raiseTo });
+                var mine = v.GetProperty("events").EnumerateArray()
+                    .First(e => e.GetProperty("kind").GetString() == "bet" && e.GetProperty("seat").GetInt32() == 0);
+                Assert.AreEqual("raise", mine.GetProperty("action").GetString());
+                Assert.AreEqual(raiseTo - before, mine.GetProperty("paid").GetInt32());
+                return;
+            }
+            Assert.Fail("30판 동안 한 번도 올릴 차례가 오지 않았다");
+        }
+
+        [Test]
         public async Task 앉기_전이나_순서가_틀린_요청은_거절된다()
         {
             Assert.IsTrue(HasError(await Post("/api/single/start")), "앉기 전");

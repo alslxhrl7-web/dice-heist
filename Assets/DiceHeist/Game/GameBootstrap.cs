@@ -172,7 +172,7 @@ namespace DiceHeist.Game
             StartScreen = StartScreen.Build(Hud.Font, Profile, Backend.Online, notice);
             StartScreen.TableChosen += Sit;
             StartScreen.ExchangeRequested += () => StartCoroutine(Exchange());
-            StartScreen.MultiRequested += () => Application.OpenURL(serverUrl);
+            StartScreen.MultiRequested += () => Application.OpenURL(serverUrl.TrimEnd('/') + "/play/");
             StartScreen.LogoutRequested += () => StartCoroutine(Logout());
             StartScreen.ResetRequested += () =>
             {

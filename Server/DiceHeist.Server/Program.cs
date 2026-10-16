@@ -112,7 +112,7 @@ app.MapPost("/api/single/start", (HttpRequest req) => Single(req, single.Start))
 app.MapPost("/api/single/rescue", (HttpRequest req) => Single(req, single.Rescue));
 app.MapPost("/api/single/reroll", (HttpRequest req, RerollRequest r) => Single(req, uid => single.Reroll(uid, r?.Held)));
 app.MapPost("/api/single/stand", (HttpRequest req) => Single(req, single.Stand));
-app.MapPost("/api/single/bet", (HttpRequest req, BetRequest b) => Single(req, uid => single.Bet(uid, b?.Action)));
+app.MapPost("/api/single/bet", (HttpRequest req, BetRequest b) => Single(req, uid => single.Bet(uid, b?.Action, b?.RaiseTo ?? 0)));
 app.MapPost("/api/single/leave", (HttpRequest req) => Single(req, single.Leave));
 
 app.MapPost("/api/exchange", (HttpRequest req, ExchangeRequest e) =>
@@ -129,7 +129,28 @@ double weightSum = WeightedDice.RankWeights.Sum();
 var hands = Enumerable.Range(0, WeightedDice.RankWeights.Length).Reverse()
     .Select(r => new { rank = r, name = HandEvaluator.NameOf((HandRank)r), chance = WeightedDice.RankWeights[r] / weightSum })
     .ToArray();
-app.MapGet("/api/config", () => new { devGrant = allowGrant, hands });
+// 테이블 등급(싱글)과 멀티 규칙. 소개 페이지가 읽는다
+var tiers = TableConfig.Tiers.Select(t => new { name = t.Name, minChips = t.MinChips, cap = t.ChipCap, ante = t.Ante, startChips = t.StartChips }).ToArray();
+var multiRules = new { maxPlayers = Room.MaxSeats, buyIn = Room.BuyIn, ante = Room.Config.Ante, starterMoney = Db.StarterMoney, exchangeRate = ChipExchange.Rate, exchangeUnit = ChipExchange.Unit, exchangeFloor = ChipExchange.Floor };
+app.MapGet("/api/config", () => new { devGrant = allowGrant, hands, tiers, multi = multiRules });
+
+// PC 게임 내려받기. 파일은 Site:WindowsZip(기본: 실행 파일 옆 downloads/DiceHeist-Windows.zip). 없으면 소개 페이지가 버튼을 숨긴다
+string windowsZip = app.Configuration["Site:WindowsZip"] ?? Path.Combine("downloads", "DiceHeist-Windows.zip");
+if (!Path.IsPathRooted(windowsZip)) windowsZip = Path.Combine(app.Environment.ContentRootPath, windowsZip);
+app.MapGet("/api/site", () =>
+{
+    var (roomCount, players) = rooms.Counts();
+    var zip = new FileInfo(windowsZip);
+    return new
+    {
+        rooms = roomCount,
+        players,
+        windows = zip.Exists ? new { size = zip.Length, updated = zip.LastWriteTimeUtc } : null,
+    };
+});
+app.MapGet("/download/windows", () => File.Exists(windowsZip)
+    ? Results.File(windowsZip, "application/zip", "DiceHeist-Windows.zip")
+    : Results.NotFound());
 if (allowGrant)
 {
     app.MapPost("/api/dev/grant", (HttpRequest req) =>
@@ -146,6 +167,7 @@ public sealed record Credentials(string Name, string Password);
 public sealed record ExchangeRequest(int Amount);
 public sealed record SitRequest(string Table);
 public sealed record RerollRequest(bool[] Held);
-public sealed record BetRequest(string Action);
+/// <param name="RaiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기. 허용 범위 밖이면 Core가 맞춘다</param>
+public sealed record BetRequest(string Action, int RaiseTo = 0);
 
 public partial class Program { }
