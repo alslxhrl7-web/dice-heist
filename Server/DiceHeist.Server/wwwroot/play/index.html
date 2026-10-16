@@ -111,10 +111,13 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
 .account{margin-top:12px}
 .account summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .account form{margin-top:8px}
+.netbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--bad);color:var(--card);font-family:var(--display)}
+.netbar .btn{padding:4px 14px;font-size:.95rem}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
+<div class="netbar" id="netbar" role="status" hidden></div>
 <div class="wrap">
   <header>
     <div>

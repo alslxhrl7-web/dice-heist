@@ -62,6 +62,7 @@ function logout() {
   token = null; profile = null; state = null;
   try { localStorage.removeItem('dh.token'); } catch {}
   if (conn) { conn.stop(); conn = null; }
+  netbar(null);
   render();
 }
 $('logoutBtn').addEventListener('click', logout);
@@ -89,8 +90,11 @@ async function connect() {
   });
   conn.on('left', reason => { state = null; if (profile) profile.inRoom = false; render(); if (reason) showError(reason); });
   conn.on('kicked', reason => { alert(reason); logout(); });
-  conn.onreconnected(() => render());
-  try { await conn.start(); }
+  // 휴대폰은 화면이 꺼지거나 망이 바뀌면 자주 끊긴다. 끊긴 줄 모르고 기다리지 않게 위에 띠를 띄운다
+  conn.onreconnecting(() => netbar('연결이 끊겨 다시 잇는 중…'));
+  conn.onreconnected(() => { netbar(null); render(); });
+  conn.onclose(() => { if (token) netbar('서버와 연결이 끊겼습니다.', true); });
+  try { await conn.start(); netbar(null); }
   catch { logout(); $('authError').textContent = '서버에 연결하지 못했습니다. 다시 로그인해 주세요.'; }
   render();
 }
@@ -158,6 +162,14 @@ function renderMute() {
 }
 $('muteBtn').addEventListener('click', () => { Sound.toggle(); renderMute(); });
 renderMute();
+
+function netbar(text, retry) {
+  const el = $('netbar');
+  el.hidden = !text;
+  if (!text) return;
+  el.innerHTML = esc(text) + (retry ? ' <button class="btn" id="reconnectBtn">다시 연결</button>' : '');
+  if (retry) $('reconnectBtn').addEventListener('click', () => { netbar('다시 잇는 중…'); connect(); });
+}
 
 // ---------- 로비 ----------
 
