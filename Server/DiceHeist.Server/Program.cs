@@ -175,6 +175,9 @@ app.MapGet("/api/site", () =>
         windows = zip.Exists ? new { size = zip.Length, updated = zip.LastWriteTimeUtc } : null,
     };
 });
+// 순위표(로그인 없이 볼 수 있다): 사이버머니 상위 10명
+app.MapGet("/api/ranking", () => db.Ranking(10).Select((r, i) => new { rank = i + 1, r.name, r.money }).ToArray());
+
 app.MapGet("/download/windows", () => File.Exists(windowsZip)
     ? Results.File(windowsZip, "application/zip", "DiceHeist-Windows.zip")
     : Results.NotFound());

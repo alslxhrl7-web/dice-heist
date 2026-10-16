@@ -305,6 +305,20 @@ CREATE TABLE IF NOT EXISTS ledger (
             Exec(c, null, "VACUUM INTO $p", ("$p", path));
         }
 
+        /// <summary>순위표: 머니 + 테이블에 가져간 stack이 많은 순. 같으면 먼저 가입한 사람이 위.</summary>
+        public List<(string name, long money)> Ranking(int count)
+        {
+            using var c = Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT u.name, u.money + COALESCE(s.stack, 0) AS total FROM users u LEFT JOIN stacks s ON s.user_id = u.id " +
+                              "ORDER BY total DESC, u.id LIMIT $n";
+            cmd.Parameters.AddWithValue("$n", count);
+            using var r = cmd.ExecuteReader();
+            var list = new List<(string, long)>();
+            while (r.Read()) list.Add((r.GetString(0), r.GetInt64(1)));
+            return list;
+        }
+
         /// <summary>검증용: 모든 사용자의 머니 + 테이블 stack 합계.</summary>
         public long TotalMoney()
         {

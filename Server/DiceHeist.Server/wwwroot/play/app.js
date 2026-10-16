@@ -203,6 +203,23 @@ function renderLobby() {
         <span class="note num">앤티 ${fmt(r.ante)} · 바이인 ${fmt(r.buyIn)}</span></div>
       <button class="btn primary" data-join="${esc(r.id)}" ${!canPlay || r.players >= r.maxPlayers ? 'disabled' : ''}>앉기</button>
     </li>`).join('') : '<li class="note">아직 방이 없습니다. 방을 만들어 보세요.</li>';
+  renderRanking();
+  loadRanking();
+}
+
+// 순위표: 로비를 볼 때 불러오고, 자주 부르지 않게 20초 동안은 다시 부르지 않는다
+let ranking = [], rankingAt = 0;
+async function loadRanking() {
+  if (Date.now() - rankingAt < 20000) return;
+  rankingAt = Date.now();
+  try { ranking = await (await fetch('/api/ranking')).json(); } catch { return; }
+  renderRanking();
+}
+function renderRanking() {
+  $('ranking').innerHTML = ranking.length ? ranking.map(r => `
+    <li class="${profile && r.name === profile.name ? 'me' : ''}"><span class="no num">${r.rank}</span>
+      <span class="who">${esc(r.name)}</span><span class="num">${fmt(r.money)}</span></li>`).join('')
+    : '<li class="note">아직 아무도 없습니다.</li>';
 }
 
 function renderGame() {
