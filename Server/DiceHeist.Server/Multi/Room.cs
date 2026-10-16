@@ -14,6 +14,8 @@ namespace DiceHeist.Server.Multi
     {
         public long UserId;
         public string Name;
+        /// <summary>고른 동물(Characters.Ids). 화면에 얼굴로 나온다.</summary>
+        public string Character;
         /// <summary>이 테이블에 올려 둔 머니. 판 중에는 DiceGame의 칩과 같다.</summary>
         public int Stack;
         public int SavedStack;
@@ -419,6 +421,7 @@ namespace DiceHeist.Server.Multi
                     return new
                     {
                         name = s.Name,
+                        character = s.Character,
                         stack = s.Stack,
                         connected = s.Connected,
                         // 보낸 지 EmoteShown이 안 된 감정 표현. ago는 보낸 뒤 지난 밀리초(화면이 남은 시간만큼만 띄운다)

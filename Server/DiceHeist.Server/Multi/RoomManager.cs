@@ -52,6 +52,18 @@ namespace DiceHeist.Server.Multi
             lock (_gate) return (_rooms.Count, _rooms.Values.Sum(r => r.Seats.Count));
         }
 
+        /// <summary>앉아 있는 동안 캐릭터를 바꾸면 자리 얼굴도 바로 바꾼다.</summary>
+        public void CharacterChanged(long userId, string character)
+        {
+            lock (_gate)
+            {
+                var room = RoomOf(userId);
+                if (room == null) return;
+                room.Find(userId).Character = character;
+                Publish(room);
+            }
+        }
+
         /// <summary>감정 표현(Room.Emotes의 번호)을 보낸다.</summary>
         public string Emote(long userId, int kind) => Act(userId, (room, seat, now) => room.Emote(seat, kind, now));
 
@@ -100,7 +112,7 @@ namespace DiceHeist.Server.Multi
             if (!_db.BuyIn(userId, room.Id, Room.BuyIn)) return $"사이버머니가 {Room.BuyIn:N0} 이상 있어야 앉을 수 있습니다.";
             room.Sit(new RoomSeat
             {
-                UserId = userId, Name = user.Name, Stack = Room.BuyIn, SavedStack = Room.BuyIn, ConnectionId = connectionId,
+                UserId = userId, Name = user.Name, Character = user.Character, Stack = Room.BuyIn, SavedStack = Room.BuyIn, ConnectionId = connectionId,
             });
             _notify?.Profile(userId, true);
             return null;

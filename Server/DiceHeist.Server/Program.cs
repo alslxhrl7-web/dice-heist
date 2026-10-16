@@ -177,7 +177,8 @@ var hands = Enumerable.Range(0, WeightedDice.RankWeights.Length).Reverse()
 // 테이블 등급(싱글)과 멀티 규칙. 소개 페이지가 읽는다
 var tiers = TableConfig.Tiers.Select(t => new { name = t.Name, minChips = t.MinChips, cap = t.ChipCap, ante = t.Ante, startChips = t.StartChips }).ToArray();
 var multiRules = new { maxPlayers = Room.MaxSeats, buyIn = Room.BuyIn, ante = Room.Config.Ante, starterMoney = Db.StarterMoney, exchangeRate = ChipExchange.Rate, exchangeUnit = ChipExchange.Unit, exchangeFloor = ChipExchange.Floor };
-app.MapGet("/api/config", () => new { devGrant = allowGrant, hands, tiers, multi = multiRules });
+var characters = Characters.Ids.Select((id, i) => new { id, name = Characters.Names[i] }).ToArray();
+app.MapGet("/api/config", () => new { devGrant = allowGrant, hands, tiers, multi = multiRules, characters });
 
 // PC 게임 내려받기. 파일은 Site:WindowsZip(기본: 실행 파일 옆 downloads/DiceHeist-Windows.zip). 없으면 소개 페이지가 버튼을 숨긴다
 string windowsZip = app.Configuration["Site:WindowsZip"] ?? Path.Combine("downloads", "DiceHeist-Windows.zip");
@@ -194,7 +195,16 @@ app.MapGet("/api/site", () =>
     };
 });
 // 순위표(로그인 없이 볼 수 있다): 사이버머니 상위 10명
-app.MapGet("/api/ranking", () => db.Ranking(10).Select((r, i) => new { rank = i + 1, r.name, r.money }).ToArray());
+app.MapGet("/api/ranking", () => db.Ranking(10).Select((r, i) => new { rank = i + 1, r.name, r.money, r.character }).ToArray());
+
+// 캐릭터 바꾸기(겉모습만). 앉아 있으면 자리 얼굴도 바로 바뀐다
+app.MapPost("/api/character", (HttpRequest req, CharacterRequest ch) =>
+{
+    if (Auth(req) is not long uid) return Results.Unauthorized();
+    if (!db.SetCharacter(uid, ch?.Character)) return Results.BadRequest(new { error = "없는 캐릭터입니다." });
+    rooms.CharacterChanged(uid, ch.Character);
+    return Profile(uid);
+});
 
 app.MapGet("/download/windows", () => File.Exists(windowsZip)
     ? Results.File(windowsZip, "application/zip", "DiceHeist-Windows.zip")
@@ -214,6 +224,7 @@ app.Run();
 public sealed record Credentials(string Name, string Password);
 public sealed record ExchangeRequest(int Amount);
 public sealed record PasswordChange(string Current, string Next);
+public sealed record CharacterRequest(string Character);
 public sealed record SitRequest(string Table);
 public sealed record RerollRequest(bool[] Held);
 /// <param name="RaiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기. 허용 범위 밖이면 Core가 맞춘다</param>

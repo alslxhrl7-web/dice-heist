@@ -11,6 +11,8 @@ namespace DiceHeist.Server.Data
         public int Chips;
         public long Money;
         public bool BronzeCleared;
+        /// <summary>고른 동물(Characters.Ids). 겉모습만 바뀐다.</summary>
+        public string Character;
         /// <summary>마지막으로 구제 머니를 받은 때. 받은 적 없으면 null.</summary>
         public DateTimeOffset? LastRescue;
         /// <summary>멀티 기록. BestRank는 HandRank 값, 쇼다운에서 족보를 보인 적 없으면 -1.</summary>
@@ -70,6 +72,18 @@ CREATE TABLE IF NOT EXISTS ledger (
   at TEXT NOT NULL
 );");
             // 시작 머니를 아직 못 받은 계정(이 기능 전에 가입한 사람)에게 한 번 준다
+            // 캐릭터 칸(2026-10-16에 생김): 예전 DB에는 없으므로 더하고, 이미 있는 계정은 번호대로 나눠 준다
+            if (Scalar(c, null, "SELECT 1 FROM pragma_table_info('users') WHERE name = 'character'") == null)
+            {
+                Exec(c, null, "ALTER TABLE users ADD COLUMN character TEXT NOT NULL DEFAULT ''");
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = "SELECT id FROM users";
+                var all = new List<long>();
+                using (var r = cmd.ExecuteReader()) while (r.Read()) all.Add(r.GetInt64(0));
+                foreach (var id in all)
+                    Exec(c, null, "UPDATE users SET character = $ch WHERE id = $u", ("$ch", Characters.DefaultFor(id)), ("$u", id));
+            }
+
             using var tx = c.BeginTransaction();
             using (var cmd = c.CreateCommand())
             {
@@ -142,6 +156,7 @@ CREATE TABLE IF NOT EXISTS ledger (
             }
             long id = (long)Scalar(c, tx, "SELECT last_insert_rowid()");
             GiveStarter(c, tx, id);
+            Exec(c, tx, "UPDATE users SET character = $ch WHERE id = $u", ("$ch", Characters.DefaultFor(id)), ("$u", id));
             tx.Commit();
             return id;
         }
@@ -172,7 +187,7 @@ CREATE TABLE IF NOT EXISTS ledger (
             using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT id, name, chips, money, bronze_cleared, " +
                 "(SELECT MAX(at) FROM ledger WHERE user_id = users.id AND kind = 'rescue'), " +
-                "COALESCE(m.rounds, 0), COALESCE(m.wins, 0), COALESCE(m.best_rank, -1), COALESCE(m.biggest_pot, 0) " +
+                "COALESCE(m.rounds, 0), COALESCE(m.wins, 0), COALESCE(m.best_rank, -1), COALESCE(m.biggest_pot, 0), character " +
                 "FROM users LEFT JOIN multi_stats m ON m.user_id = users.id WHERE id = $id";
             cmd.Parameters.AddWithValue("$id", id);
             using var r = cmd.ExecuteReader();
@@ -182,6 +197,7 @@ CREATE TABLE IF NOT EXISTS ledger (
                 Id = r.GetInt64(0), Name = r.GetString(1), Chips = r.GetInt32(2), Money = r.GetInt64(3), BronzeCleared = r.GetInt32(4) == 1,
                 LastRescue = r.IsDBNull(5) ? null : DateTimeOffset.Parse(r.GetString(5), System.Globalization.CultureInfo.InvariantCulture),
                 Rounds = r.GetInt32(6), Wins = r.GetInt32(7), BestRank = r.GetInt32(8), BiggestPot = r.GetInt64(9),
+                Character = Characters.IsValid(r.GetString(10)) ? r.GetString(10) : Characters.DefaultFor(r.GetInt64(0)),
             };
         }
 
@@ -339,17 +355,26 @@ CREATE TABLE IF NOT EXISTS ledger (
         }
 
         /// <summary>순위표: 머니 + 테이블에 가져간 stack이 많은 순. 같으면 먼저 가입한 사람이 위.</summary>
-        public List<(string name, long money)> Ranking(int count)
+        public List<(string name, long money, string character)> Ranking(int count)
         {
             using var c = Open();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT u.name, u.money + COALESCE(s.stack, 0) AS total FROM users u LEFT JOIN stacks s ON s.user_id = u.id " +
+            cmd.CommandText = "SELECT u.name, u.money + COALESCE(s.stack, 0) AS total, u.character FROM users u LEFT JOIN stacks s ON s.user_id = u.id " +
                               "ORDER BY total DESC, u.id LIMIT $n";
             cmd.Parameters.AddWithValue("$n", count);
             using var r = cmd.ExecuteReader();
-            var list = new List<(string, long)>();
-            while (r.Read()) list.Add((r.GetString(0), r.GetInt64(1)));
+            var list = new List<(string, long, string)>();
+            while (r.Read()) list.Add((r.GetString(0), r.GetInt64(1), r.GetString(2)));
             return list;
+        }
+
+        /// <summary>캐릭터를 바꾼다. 없는 id면 false.</summary>
+        public bool SetCharacter(long userId, string character)
+        {
+            if (!Characters.IsValid(character)) return false;
+            using var c = Open();
+            Exec(c, null, "UPDATE users SET character = $ch WHERE id = $u", ("$ch", character), ("$u", userId));
+            return true;
         }
 
         /// <summary>끝난 멀티 판의 결과를 사람마다 기록에 더한다.</summary>

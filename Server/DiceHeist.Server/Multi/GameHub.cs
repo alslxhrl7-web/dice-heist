@@ -28,6 +28,7 @@ namespace DiceHeist.Server.Multi
         public static object Of(UserRow u, bool inRoom) => new
         {
             name = u.Name,
+            character = u.Character,
             chips = u.Chips,
             money = u.Money,
             bronzeCleared = u.BronzeCleared,
