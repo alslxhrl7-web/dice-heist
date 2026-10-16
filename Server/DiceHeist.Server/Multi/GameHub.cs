@@ -36,6 +36,8 @@ namespace DiceHeist.Server.Multi
             exchangeRate = DiceHeist.Core.ChipExchange.Rate,
             buyIn = Room.BuyIn,
             inRoom,
+            // 구제 머니(하루 한 번, 바이인까지 채움)를 지금 받을 수 있는지
+            canRescue = !inRoom && Rescue.Available(u.Money, u.LastRescue, Room.BuyIn, DateTimeOffset.UtcNow),
         };
     }
 

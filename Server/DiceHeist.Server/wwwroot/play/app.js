@@ -77,6 +77,7 @@ async function connect() {
   conn.on('profile', p => { profile = p; if (!p.inRoom) state = null; render(); });
   conn.on('lobby', list => { rooms = list; render(); });
   conn.on('state', s => {
+    cue(state, s);
     state = s;
     clockOffset = s.serverNow - Date.now();
     const me = s.seats[s.mySeat];
@@ -94,6 +95,70 @@ async function connect() {
   render();
 }
 
+// ---------- 소리와 내 차례 알림 ----------
+
+// 바로 전 상태와 비교해 무슨 일이 일어났는지 보고 소리를 낸다. 자리는 사람이 나가면 밀리므로 이름으로 맞춘다
+function cue(prev, s) {
+  const mine = s.seats[s.mySeat];
+  const sameRound = prev && prev.roundNo === s.roundNo;
+  const before = new Map(sameRound ? prev.seats.map(p => [p.name, p]) : []);
+  const was = mine && before.get(mine.name);
+  // 처음 받은 상태(접속·새로고침)에는 소리를 내지 않는다
+  if (prev) cueSounds(prev, s, mine, was, before, sameRound);
+
+  const turnNow = (s.phase === 'betting' && s.me?.myTurn) || (s.phase === 'hold' && s.me?.canReroll);
+  const turnBefore = prev && ((prev.phase === 'betting' && prev.me?.myTurn) || (prev.phase === 'hold' && prev.me?.canReroll && sameRound));
+  if (turnNow && !turnBefore) {
+    if (s.phase === 'betting') Sound.play('turn');
+    if (navigator.vibrate && !Sound.muted) navigator.vibrate(120);
+  }
+  attention(turnNow ? (s.phase === 'betting' ? '내 차례! 걸기' : '주사위 굴릴 차례') : null);
+}
+
+function cueSounds(prev, s, mine, was, before, sameRound) {
+  if (mine?.dice && (!was?.dice || was.rerolls !== mine.rerolls)) {
+    const changed = was?.dice ? mine.dice.filter((v, i) => v !== was.dice[i]).length : 5;
+    Sound.play('dice', changed || 5);
+  }
+  let chips = false, fold = false, reveal = false, cup = false;
+  for (const p of s.seats) {
+    const q = before.get(p.name);
+    if (!q) continue;
+    if (p.status !== q.status && (p.status === 'called' || p.status === 'raised')) chips = true;
+    if (p.folded && !q.folded) fold = true;
+    if (p !== mine && p.dice && !q.dice) reveal = true;
+    if (p !== mine && p.rerolls > q.rerolls) cup = true;
+  }
+  if (chips) Sound.play('chips');
+  if (fold) Sound.play('fold');
+  if (reveal) Sound.play('reveal');
+  if (cup) Sound.play('dice', 2);
+  if (s.phase === 'result' && sameRound && prev.phase !== 'result' && mine?.inHand)
+    setTimeout(() => Sound.play(mine.winner ? 'win' : 'lose'), 350);
+}
+
+// 다른 탭을 보고 있을 때 내 차례면 탭 제목을 깜빡인다(걸기는 20초가 지나면 자동으로 폴드된다)
+const baseTitle = document.title;
+let attentionText = null, attentionTimer = null;
+function attention(text) {
+  if (text === attentionText && (attentionTimer || !document.hidden)) return;
+  attentionText = text;
+  clearInterval(attentionTimer); attentionTimer = null;
+  document.title = baseTitle;
+  if (!text || !document.hidden) return;
+  let on = false;
+  attentionTimer = setInterval(() => { on = !on; document.title = on ? '● ' + attentionText : baseTitle; }, 900);
+}
+document.addEventListener('visibilitychange', () => attention(attentionText));
+
+function renderMute() {
+  const b = $('muteBtn');
+  b.textContent = Sound.muted ? '🔇 소리 꺼짐' : '🔊 소리 켜짐';
+  b.setAttribute('aria-pressed', String(!Sound.muted));
+}
+$('muteBtn').addEventListener('click', () => { Sound.toggle(); renderMute(); });
+renderMute();
+
 // ---------- 로비 ----------
 
 $('createForm').addEventListener('submit', e => {
@@ -106,6 +171,19 @@ $('rooms').addEventListener('click', e => {
 });
 $('exchangeBtn').addEventListener('click', async () => {
   try { profile = await api('/api/exchange', { amount: profile.exchangeUnit }); render(); }
+  catch (err) { showError(err.message); }
+});
+$('pwForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    profile = await api('/api/password', { current: $('pwCurrent').value, next: $('pwNext').value });
+    $('pwForm').reset();
+    $('pwNote').textContent = '비밀번호를 바꿨습니다. 다른 곳의 로그인은 끊겼습니다.';
+    render();
+  } catch (err) { $('pwNote').textContent = err.message; }
+});
+$('rescueBtn').addEventListener('click', async () => {
+  try { profile = await api('/api/rescue', {}); render(); }
   catch (err) { showError(err.message); }
 });
 $('grantBtn').addEventListener('click', async () => {
@@ -169,6 +247,7 @@ function render() {
   $('stats').innerHTML = loggedIn ? [
     ['계정', esc(profile.name)], ['싱글 칩', fmt(profile.chips)], ['사이버머니', fmt(profile.money)],
   ].map(([k, v]) => `<div class="stat"><span>${k}</span><b class="num">${v}</b></div>`).join('') : '';
+  if (!state && attentionText) attention(null);
   if (!loggedIn) return;
 
   if (!state) renderLobby(); else renderGame();
@@ -181,9 +260,14 @@ function renderLobby() {
   $('grantBtn').hidden = !devGrant;
 
   const canPlay = profile.money >= profile.buyIn;
+  const rb = $('rescueBtn');
+  rb.hidden = !profile.canRescue;
+  rb.innerHTML = `구제 머니 받기<small>${fmt(profile.buyIn)}까지 채움 · 하루 한 번</small>`;
   $('lobbyNote').textContent =
     `방에 앉으면 사이버머니 ${fmt(profile.buyIn)}을 테이블로 가져가고, 일어나면 남은 만큼 돌려받습니다.`
-    + (canPlay ? '' : ' 지금은 사이버머니가 모자랍니다. PC 게임(싱글)에서 칩을 벌어 환전하면 채울 수 있습니다.');
+    + (canPlay ? '' : profile.canRescue
+      ? ' 지금은 사이버머니가 모자랍니다. [구제 머니 받기]로 채우거나, PC 게임(싱글)에서 칩을 벌어 환전하세요.'
+      : ' 지금은 사이버머니가 모자랍니다. 구제 머니는 하루 한 번이라 내일(한국 시간 자정 뒤) 다시 받을 수 있고, PC 게임(싱글)에서 칩을 벌어 환전해도 됩니다.');
   $('createForm').querySelector('button').disabled = !canPlay;
 
   $('rooms').innerHTML = rooms.length ? rooms.map(r => `
@@ -194,6 +278,23 @@ function renderLobby() {
         <span class="note num">앤티 ${fmt(r.ante)} · 바이인 ${fmt(r.buyIn)}</span></div>
       <button class="btn primary" data-join="${esc(r.id)}" ${!canPlay || r.players >= r.maxPlayers ? 'disabled' : ''}>앉기</button>
     </li>`).join('') : '<li class="note">아직 방이 없습니다. 방을 만들어 보세요.</li>';
+  renderRanking();
+  loadRanking();
+}
+
+// 순위표: 로비를 볼 때 불러오고, 자주 부르지 않게 20초 동안은 다시 부르지 않는다
+let ranking = [], rankingAt = 0;
+async function loadRanking() {
+  if (Date.now() - rankingAt < 20000) return;
+  rankingAt = Date.now();
+  try { ranking = await (await fetch('/api/ranking')).json(); } catch { return; }
+  renderRanking();
+}
+function renderRanking() {
+  $('ranking').innerHTML = ranking.length ? ranking.map(r => `
+    <li class="${profile && r.name === profile.name ? 'me' : ''}"><span class="no num">${r.rank}</span>
+      <span class="who">${esc(r.name)}</span><span class="num">${fmt(r.money)}</span></li>`).join('')
+    : '<li class="note">아직 아무도 없습니다.</li>';
 }
 
 function renderGame() {

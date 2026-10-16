@@ -1,11 +1,14 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using DiceHeist.Server.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
 namespace DiceHeist.Server.Tests
 {
-    /// <summary>소개 페이지(/), 멀티 화면(/play/), PC 게임 내려받기.</summary>
+    /// <summary>소개 페이지(/), 멀티 화면(/play/), 순위표, PC 게임 내려받기.</summary>
     public class SiteTests
     {
         WebApplicationFactory<Program> _factory;
@@ -56,6 +59,21 @@ namespace DiceHeist.Server.Tests
             CollectionAssert.AreEqual(new[] { "브론즈", "실버", "골드" }, tiers);
             Assert.AreEqual(6, cfg.GetProperty("multi").GetProperty("maxPlayers").GetInt32());
             Assert.AreEqual(50_000, cfg.GetProperty("multi").GetProperty("buyIn").GetInt32());
+        }
+
+        [Test]
+        public async Task 순위는_테이블에_가져간_머니까지_세어_많은_순이다()
+        {
+            var http = _factory.CreateClient();
+            foreach (var name in new[] { "하나", "두울", "세엣" })
+                Assert.IsTrue((await http.PostAsJsonAsync("/api/register", new { name, password = "secret123" })).IsSuccessStatusCode);
+            var db = _factory.Services.GetRequiredService<Db>();
+            db.BuyIn(2, "r", 50_000); db.UpdateStack(2, 80_000);   // 두울: 머니 50,000 + 테이블 80,000
+            db.BuyIn(3, "r", 50_000); db.UpdateStack(3, 0); db.CashOut(3); // 세엣: 50,000
+
+            var list = JsonDocument.Parse(await http.GetStringAsync("/api/ranking")).RootElement.EnumerateArray()
+                .Select(r => (r.GetProperty("rank").GetInt32(), r.GetProperty("name").GetString(), r.GetProperty("money").GetInt64())).ToArray();
+            CollectionAssert.AreEqual(new[] { (1, "두울", 130_000L), (2, "하나", 100_000L), (3, "세엣", 50_000L) }, list);
         }
 
         [Test]

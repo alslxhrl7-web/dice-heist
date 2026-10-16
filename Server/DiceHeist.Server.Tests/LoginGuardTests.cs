@@ -6,7 +6,7 @@ using NUnit.Framework;
 
 namespace DiceHeist.Server.Tests
 {
-    /// <summary>비밀번호를 계속 틀린 아이디 잠그기와 가입 횟수 제한.</summary>
+    /// <summary>비밀번호를 계속 틀린 아이디 잠그기, 가입 횟수 제한, 비밀번호 바꾸기.</summary>
     public class LoginGuardTests
     {
         DateTimeOffset _now = new DateTimeOffset(2026, 10, 16, 0, 0, 0, TimeSpan.Zero);
@@ -102,6 +102,40 @@ namespace DiceHeist.Server.Tests
             // 없는 아이디는 몇 번을 틀려도 잠그지 않는다(가입 안내가 계속 나온다)
             for (int i = 0; i < 5; i++)
                 StringAssert.Contains("가입된 계정이 없습니다", await Error(await http.PostAsJsonAsync("/api/login", new { name = "없는이", password = "whatever" })));
+        }
+
+        [Test]
+        public async Task 비밀번호를_바꾸면_다른_기기의_로그인은_끊기고_새_비밀번호로_들어온다()
+        {
+            var phone = _factory.CreateClient();
+            var pc = _factory.CreateClient();
+            var reg = await (await phone.PostAsJsonAsync("/api/register", new { name = "토끼", password = "secret123" })).Content.ReadFromJsonAsync<JsonElement>();
+            phone.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reg.GetProperty("token").GetString());
+            var login = await (await pc.PostAsJsonAsync("/api/login", new { name = "토끼", password = "secret123" })).Content.ReadFromJsonAsync<JsonElement>();
+            pc.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", login.GetProperty("token").GetString());
+
+            var wrong = await phone.PostAsJsonAsync("/api/password", new { current = "nope", next = "newpass99" });
+            StringAssert.Contains("맞지 않습니다", await Error(wrong));
+            StringAssert.Contains("6~64자", await Error(await phone.PostAsJsonAsync("/api/password", new { current = "secret123", next = "123" })));
+
+            Assert.IsTrue((await phone.PostAsJsonAsync("/api/password", new { current = "secret123", next = "newpass99" })).IsSuccessStatusCode);
+            Assert.AreEqual(HttpStatusCode.OK, (await phone.GetAsync("/api/me")).StatusCode, "바꾼 기기는 그대로");
+            Assert.AreEqual(HttpStatusCode.Unauthorized, (await pc.GetAsync("/api/me")).StatusCode, "다른 기기는 끊긴다");
+
+            var anon = _factory.CreateClient();
+            Assert.AreEqual(HttpStatusCode.BadRequest, (await anon.PostAsJsonAsync("/api/login", new { name = "토끼", password = "secret123" })).StatusCode);
+            Assert.IsTrue((await anon.PostAsJsonAsync("/api/login", new { name = "토끼", password = "newpass99" })).IsSuccessStatusCode);
+        }
+
+        [Test]
+        public async Task 비밀번호_바꾸기에서_틀려도_잠금_횟수에_든다()
+        {
+            var http = _factory.CreateClient();
+            var reg = await (await http.PostAsJsonAsync("/api/register", new { name = "토끼", password = "secret123" })).Content.ReadFromJsonAsync<JsonElement>();
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reg.GetProperty("token").GetString());
+            for (int i = 0; i < 3; i++) await http.PostAsJsonAsync("/api/password", new { current = "guess" + i, next = "newpass99" });
+            var res = await http.PostAsJsonAsync("/api/password", new { current = "secret123", next = "newpass99" });
+            Assert.AreEqual(HttpStatusCode.TooManyRequests, res.StatusCode, "훔친 토큰으로 비밀번호를 맞혀 보는 것도 막는다");
         }
 
         [Test]
