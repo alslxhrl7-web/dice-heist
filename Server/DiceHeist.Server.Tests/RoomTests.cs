@@ -284,5 +284,33 @@ namespace DiceHeist.Server.Tests
             string second = State(_a).GetProperty("seats").EnumerateArray().First(s => s.GetProperty("starter").GetBoolean()).GetProperty("name").GetString();
             Assert.AreNotEqual(first, second);
         }
+        [Test]
+        public void 판이_끝나면_사람마다_결과를_한_번씩_내놓는다()
+        {
+            StartRound();
+            _room.Stand(_a, _now); _room.Stand(_b, _now);
+            while (_room.Phase == "betting") _room.Bet(CurrentBettor(), "call", _now);
+            Assert.AreEqual("result", _room.Phase);
+
+            var recs = _room.TakeRecords();
+            Assert.AreEqual(2, recs.Count);
+            CollectionAssert.AreEquivalent(new[] { _a.UserId, _b.UserId }, recs.Select(r => r.UserId));
+            Assert.IsTrue(recs.All(r => r.Rank >= 0), "쇼다운까지 가면 족보가 남는다");
+            var winners = recs.Where(r => r.Won).ToList();
+            Assert.IsNotEmpty(winners);
+            Assert.AreEqual(4 * _room.Ante, winners.Sum(w => w.Amount), "앤티 둘 + 콜 둘이 팟");
+            Assert.IsEmpty(_room.TakeRecords(), "한 번 가져가면 비어 있다");
+        }
+
+        [Test]
+        public void 모두_폴드해서_끝난_판은_족보가_남지_않는다()
+        {
+            StartRound();
+            _room.Stand(_a, _now); _room.Stand(_b, _now);
+            _room.Bet(CurrentBettor(), "fold", _now);
+            var recs = _room.TakeRecords();
+            Assert.IsTrue(recs.All(r => r.Rank == -1));
+            Assert.AreEqual(1, recs.Count(r => r.Won));
+        }
     }
 }

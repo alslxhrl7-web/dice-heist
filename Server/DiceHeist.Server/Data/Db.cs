@@ -13,6 +13,9 @@ namespace DiceHeist.Server.Data
         public bool BronzeCleared;
         /// <summary>마지막으로 구제 머니를 받은 때. 받은 적 없으면 null.</summary>
         public DateTimeOffset? LastRescue;
+        /// <summary>멀티 기록. BestRank는 HandRank 값, 쇼다운에서 족보를 보인 적 없으면 -1.</summary>
+        public int Rounds, Wins, BestRank = -1;
+        public long BiggestPot;
     }
 
     /// <summary>
@@ -49,6 +52,14 @@ CREATE TABLE IF NOT EXISTS stacks (
   user_id INTEGER PRIMARY KEY REFERENCES users(id),
   room_id TEXT NOT NULL,
   stack INTEGER NOT NULL
+);
+-- 멀티 기록(사람마다 한 줄): 낀 판 수, 이긴 판 수(나눈 판 포함), 쇼다운에서 보인 가장 높은 족보(-1은 아직 없음), 이겨서 가져온 가장 큰 금액
+CREATE TABLE IF NOT EXISTS multi_stats (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  rounds INTEGER NOT NULL DEFAULT 0,
+  wins INTEGER NOT NULL DEFAULT 0,
+  best_rank INTEGER NOT NULL DEFAULT -1,
+  biggest_pot INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS ledger (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -160,7 +171,9 @@ CREATE TABLE IF NOT EXISTS ledger (
             using var c = Open();
             using var cmd = c.CreateCommand();
             cmd.CommandText = "SELECT id, name, chips, money, bronze_cleared, " +
-                "(SELECT MAX(at) FROM ledger WHERE user_id = users.id AND kind = 'rescue') FROM users WHERE id = $id";
+                "(SELECT MAX(at) FROM ledger WHERE user_id = users.id AND kind = 'rescue'), " +
+                "COALESCE(m.rounds, 0), COALESCE(m.wins, 0), COALESCE(m.best_rank, -1), COALESCE(m.biggest_pot, 0) " +
+                "FROM users LEFT JOIN multi_stats m ON m.user_id = users.id WHERE id = $id";
             cmd.Parameters.AddWithValue("$id", id);
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return null;
@@ -168,6 +181,7 @@ CREATE TABLE IF NOT EXISTS ledger (
             {
                 Id = r.GetInt64(0), Name = r.GetString(1), Chips = r.GetInt32(2), Money = r.GetInt64(3), BronzeCleared = r.GetInt32(4) == 1,
                 LastRescue = r.IsDBNull(5) ? null : DateTimeOffset.Parse(r.GetString(5), System.Globalization.CultureInfo.InvariantCulture),
+                Rounds = r.GetInt32(6), Wins = r.GetInt32(7), BestRank = r.GetInt32(8), BiggestPot = r.GetInt64(9),
             };
         }
 
@@ -338,6 +352,20 @@ CREATE TABLE IF NOT EXISTS ledger (
             return list;
         }
 
+        /// <summary>끝난 멀티 판의 결과를 사람마다 기록에 더한다.</summary>
+        public void RecordRounds(IReadOnlyList<RoundRecord> records)
+        {
+            if (records.Count == 0) return;
+            using var c = Open();
+            using var tx = c.BeginTransaction();
+            foreach (var r in records)
+                Exec(c, tx, "INSERT INTO multi_stats(user_id, rounds, wins, best_rank, biggest_pot) VALUES ($u, 1, $w, $r, $p) " +
+                             "ON CONFLICT(user_id) DO UPDATE SET rounds = rounds + 1, wins = wins + excluded.wins, " +
+                             "best_rank = MAX(best_rank, excluded.best_rank), biggest_pot = MAX(biggest_pot, excluded.biggest_pot)",
+                    ("$u", r.UserId), ("$w", r.Won ? 1 : 0), ("$r", r.Rank), ("$p", r.Won ? r.Amount : 0));
+            tx.Commit();
+        }
+
         /// <summary>검증용: 모든 사용자의 머니 + 테이블 stack 합계.</summary>
         public long TotalMoney()
         {
@@ -345,6 +373,9 @@ CREATE TABLE IF NOT EXISTS ledger (
             return Convert.ToInt64(Scalar(c, null, "SELECT (SELECT COALESCE(SUM(money),0) FROM users) + (SELECT COALESCE(SUM(stack),0) FROM stacks)"));
         }
     }
+
+    /// <summary>멀티 한 판에서 한 사람의 결과. Amount는 이겨서 가져온 금액(나눈 판은 몫), Rank는 쇼다운에서 보인 족보(안 보였으면 -1).</summary>
+    public sealed record RoundRecord(long UserId, bool Won, int Amount, int Rank);
 
     /// <summary>구제 머니를 받을 수 있는지. 하루의 경계는 한국 시간 자정.</summary>
     public static class Rescue

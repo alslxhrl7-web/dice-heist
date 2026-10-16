@@ -3,7 +3,7 @@ using NUnit.Framework;
 
 namespace DiceHeist.Server.Tests
 {
-    /// <summary>로그인 토큰: 30일 기한, 기한이 지나면 정리된다.</summary>
+    /// <summary>DB 단위: 로그인 토큰 정리, 멀티 기록.</summary>
     public class SessionTests
     {
         string _dbPath;
@@ -30,6 +30,21 @@ namespace DiceHeist.Server.Tests
             Assert.AreEqual(id, db.UserIdByToken(token));
             Assert.AreEqual(1, db.DeleteExpiredSessions(DateTimeOffset.UtcNow.AddDays(31)));
             Assert.IsNull(db.UserIdByToken(token));
+        }
+
+        [Test]
+        public void 멀티_기록은_판마다_더하고_최고값만_남긴다()
+        {
+            var db = new Db(_dbPath);
+            long id = db.CreateUser("토끼", "secret123").Value;
+            var u = db.GetUser(id);
+            Assert.AreEqual((0, 0, -1, 0L), (u.Rounds, u.Wins, u.BestRank, u.BiggestPot), "기록이 없으면 0");
+
+            db.RecordRounds(new[] { new RoundRecord(id, true, 6_000, 4) });
+            db.RecordRounds(new[] { new RoundRecord(id, false, 0, 6) });
+            db.RecordRounds(new[] { new RoundRecord(id, true, 2_000, -1) });
+            u = db.GetUser(id);
+            Assert.AreEqual((3, 2, 6, 6_000L), (u.Rounds, u.Wins, u.BestRank, u.BiggestPot));
         }
     }
 }

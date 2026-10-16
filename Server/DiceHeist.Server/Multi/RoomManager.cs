@@ -201,6 +201,7 @@ namespace DiceHeist.Server.Multi
         /// <summary>방 상태를 앉은 사람들에게 보내고, stack 변화를 저장하고, 빈 방은 지우고, 목록이 바뀌었으면 로비에 알린다.</summary>
         void Publish(Room room)
         {
+            _db.RecordRounds(room.TakeRecords());
             foreach (var s in room.Seats)
             {
                 if (s.Stack == s.SavedStack) continue;

@@ -285,6 +285,14 @@ function renderLobby() {
       : ' 지금은 사이버머니가 모자랍니다. 구제 머니는 하루 한 번이라 내일(한국 시간 자정 뒤) 다시 받을 수 있고, PC 게임(싱글)에서 칩을 벌어 환전해도 됩니다.');
   $('createForm').querySelector('button').disabled = !canPlay;
 
+  const rec = profile.record;
+  $('record').innerHTML = !rec ? '' : [
+    ['내 기록 · 판', fmt(rec.rounds)],
+    ['이긴 판', rec.rounds ? `${fmt(rec.wins)} (${Math.round(rec.wins / rec.rounds * 100)}%)` : '0'],
+    ['최고 족보', esc(rec.bestHand || '아직 없음')],
+    ['가장 큰 팟', rec.biggestPot ? fmt(rec.biggestPot) : '아직 없음'],
+  ].map(([k, v]) => `<div class="stat"><span>${k}</span><b class="num">${v}</b></div>`).join('');
+
   $('rooms').innerHTML = rooms.length ? rooms.map(r => `
     <li>
       <div><strong>${esc(r.name)}</strong>

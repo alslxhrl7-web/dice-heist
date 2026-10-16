@@ -73,6 +73,15 @@ namespace DiceHeist.Server.Multi
         bool[] _acted = Array.Empty<bool>();
         int _dealer;
         string _banner;
+        /// <summary>끝났지만 아직 DB에 적지 않은 판 결과. RoomManager가 TakeRecords로 가져간다.</summary>
+        readonly List<Data.RoundRecord> _records = new List<Data.RoundRecord>();
+
+        public List<Data.RoundRecord> TakeRecords()
+        {
+            var list = _records.ToList();
+            _records.Clear();
+            return list;
+        }
 
         public Room(string id, string name, MultiTimings timings, IRandom rng)
         {
@@ -242,6 +251,13 @@ namespace DiceHeist.Server.Multi
                     ? $"무승부 · {string.Join(", ", res.Winners.Select(w => w.Name))} · {hand} · {res.Share:N0}씩"
                     : $"{res.Winners[0].Name} 승리 · {hand} · +{pot:N0}";
                 Log("쇼다운 · " + string.Join(" / ", res.Hands.Select(h => $"{h.player.Name} {HandEvaluator.NameOf(h.hand.Rank)}")));
+            }
+            foreach (var p in _game.Players)
+            {
+                bool won = res.Winners.Contains(p);
+                int amount = !won ? 0 : res.Winners.Count > 1 ? res.Share : pot;
+                int rank = res.Hands.Where(h => h.player == p).Select(h => (int)h.hand.Rank).DefaultIfEmpty(-1).First();
+                _records.Add(new Data.RoundRecord(SeatOf(p).UserId, won, amount, rank));
             }
             Phase = "result";
             Deadline = now + _t.Result;

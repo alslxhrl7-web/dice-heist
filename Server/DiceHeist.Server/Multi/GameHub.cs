@@ -36,6 +36,14 @@ namespace DiceHeist.Server.Multi
             exchangeRate = DiceHeist.Core.ChipExchange.Rate,
             buyIn = Room.BuyIn,
             inRoom,
+            // 멀티 기록: 낀 판, 이긴 판, 쇼다운에서 보인 가장 높은 족보, 이겨서 가져온 가장 큰 금액
+            record = new
+            {
+                rounds = u.Rounds,
+                wins = u.Wins,
+                bestHand = u.BestRank >= 0 ? DiceHeist.Core.HandEvaluator.NameOf((DiceHeist.Core.HandRank)u.BestRank) : null,
+                biggestPot = u.BiggestPot,
+            },
             // 구제 머니(하루 한 번, 바이인까지 채움)를 지금 받을 수 있는지
             canRescue = !inRoom && Rescue.Available(u.Money, u.LastRescue, Room.BuyIn, DateTimeOffset.UtcNow),
         };

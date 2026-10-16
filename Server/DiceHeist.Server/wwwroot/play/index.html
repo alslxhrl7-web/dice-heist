@@ -108,6 +108,8 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
 .ranking .no{font-family:var(--display);color:var(--muted)}
 .ranking li.me .no{color:inherit}
 .ranking .who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.record{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.record .stat{background:var(--bg)}
 .account{margin-top:12px}
 .account summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .account form{margin-top:8px}
@@ -162,6 +164,7 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
         <input id="roomName" placeholder="방 이름" maxlength="20">
         <button class="btn primary" type="submit">방 만들기</button>
       </form>
+      <div class="record" id="record" aria-label="내 기록"></div>
       <details class="account">
         <summary>비밀번호 바꾸기</summary>
         <form class="row" id="pwForm">
