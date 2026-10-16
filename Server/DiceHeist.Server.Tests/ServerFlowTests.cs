@@ -108,16 +108,25 @@ namespace DiceHeist.Server.Tests
             Assert.IsNull(await a.Hub.InvokeAsync<string>("Stand"));
             Assert.IsNull(await b.Hub.InvokeAsync<string>("Stand"));
 
-            // 차례가 온 사람이 콜한다. 결과가 나올 때까지
+            // 처음 차례가 온 사람은 앤티 5배로 올리고, 그다음부터는 콜한다. 결과가 나올 때까지
             var until = DateTime.UtcNow.AddSeconds(20);
+            bool raised = false;
             while (DateTime.UtcNow < until)
             {
                 if (a.State is JsonElement sa && Phase(sa) == "result") break;
                 foreach (var p in new[] { a, b })
                     if (p.State is JsonElement s && Phase(s) == "betting" && MyTurn(s))
-                        await p.Hub.InvokeAsync<string>("Bet", "call");
+                    {
+                        if (!raised && s.GetProperty("me").GetProperty("canRaise").GetBoolean())
+                        {
+                            raised = true;
+                            Assert.IsNull(await p.Hub.InvokeAsync<string>("RaiseTo", 5_000));
+                        }
+                        else await p.Hub.InvokeAsync<string>("Bet", "call");
+                    }
                 await Task.Delay(50);
             }
+            Assert.IsTrue(raised, "레이즈 크기를 골라 올렸다");
             var result = await WaitFor(a, s => Phase(s) == "result", "결과");
             Assert.IsNotNull(result.GetProperty("banner").GetString());
             Assert.AreEqual(total, db.TotalMoney(), "판이 끝나도 머니 총량은 그대로");

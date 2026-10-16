@@ -200,10 +200,10 @@ namespace DiceHeist.Server.Multi
             }
         }
 
-        void ApplyBet(BetAction request)
+        void ApplyBet(BetAction request, int raiseTo = 0)
         {
             var p = _game.Betting.Current;
-            var (act, paid) = _game.Betting.Apply(request);
+            var (act, paid) = _game.Betting.Apply(request, raiseTo > 0 ? raiseTo : _game.RaiseTotal);
             switch (act)
             {
                 case BetAction.Fold: Log($"{p.Name} · 폴드 (포기)"); break;
@@ -282,7 +282,8 @@ namespace DiceHeist.Server.Multi
             return null;
         }
 
-        public string Bet(RoomSeat seat, string action, DateTimeOffset now)
+        /// <param name="raiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기(앤티 × RaiseMultiplier). 범위 밖이면 Core가 맞춘다.</param>
+        public string Bet(RoomSeat seat, string action, DateTimeOffset now, int raiseTo = 0)
         {
             var p = P(seat);
             if (Phase != "betting" || p == null || _game.Betting.Current != p) return "지금은 내 차례가 아닙니다.";
@@ -294,7 +295,7 @@ namespace DiceHeist.Server.Multi
                 case "raise": request = BetAction.Raise; break;
                 default: return "알 수 없는 베팅입니다.";
             }
-            ApplyBet(request);
+            ApplyBet(request, raiseTo);
             if (!_game.Betting.IsDone) Deadline = now + _t.Bet;
             Advance(now);
             return null;
@@ -368,7 +369,11 @@ namespace DiceHeist.Server.Multi
                     canCall = bet != null && current == mine && bet.CanCall(mine),
                     raiseCost = bet != null && current == mine ? bet.RaiseCost(mine) : 0,
                     raiseTimes = Times(_cfg.Ante * _cfg.RaiseMultiplier),
-                    canRaise = bet != null && current == mine && bet.CanRaise(mine),
+                    canRaise = bet != null && current == mine && bet.CanRaiseAny(mine),
+                    // 고를 수 있는 레이즈 크기(이번 판 누적, 앤티 단위). 올릴 수 없으면 0
+                    minRaise = bet != null && current == mine && bet.CanRaiseAny(mine) ? bet.MinRaiseFor(mine) : 0,
+                    maxRaise = bet != null && current == mine && bet.CanRaiseAny(mine) ? bet.MaxRaiseFor(mine) : 0,
+                    contrib = mine.Contrib,
                 },
             };
         }

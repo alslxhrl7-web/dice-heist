@@ -68,6 +68,43 @@ namespace DiceHeist.Server.Tests
         }
 
         [Test]
+        public void 레이즈_크기를_고르면_그만큼_올리고_범위_밖은_맞춘다()
+        {
+            StartRound();
+            _room.Stand(_a, _now);
+            _room.Stand(_b, _now);
+            var first = CurrentBettor();
+            var me = State(first).GetProperty("me");
+            Assert.IsTrue(me.GetProperty("canRaise").GetBoolean());
+            Assert.AreEqual(_room.Ante * 2, me.GetProperty("minRaise").GetInt32());
+            Assert.AreEqual(_room.Ante * 10, me.GetProperty("maxRaise").GetInt32());
+
+            long before = first.Stack;
+            Assert.IsNull(_room.Bet(first, "raise", _now, _room.Ante * 7));
+            Assert.AreEqual(before - _room.Ante * 7, first.Stack, "누적(앤티 제외) 7배가 되게 낸다");
+
+            var other = CurrentBettor();
+            var otherMe = State(other).GetProperty("me");
+            Assert.AreEqual(0, otherMe.GetProperty("maxRaise").GetInt32(), "레이즈는 판당 한 번");
+            Assert.AreEqual(_room.Ante * 7, otherMe.GetProperty("callCost").GetInt32(), "따라가려면 같은 만큼 낸다");
+            Assert.IsNull(_room.Bet(other, "call", _now));
+            Assert.AreEqual("result", _room.Phase);
+            Assert.AreEqual(2 * Room.BuyIn, _a.Stack + _b.Stack, "칩 총량은 그대로");
+        }
+
+        [Test]
+        public void 한도보다_크게_올리려_하면_최대_크기로_맞춘다()
+        {
+            StartRound();
+            _room.Stand(_a, _now);
+            _room.Stand(_b, _now);
+            var first = CurrentBettor();
+            long before = first.Stack;
+            Assert.IsNull(_room.Bet(first, "raise", _now, int.MaxValue));
+            Assert.AreEqual(before - _room.Ante * 10, first.Stack, "최대 10배");
+        }
+
+        [Test]
         public void 남의_주사위는_쇼다운_전까지_보이지_않는다()
         {
             StartRound();

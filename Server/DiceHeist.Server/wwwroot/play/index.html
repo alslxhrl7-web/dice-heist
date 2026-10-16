@@ -77,7 +77,7 @@ button.die{width:62px;height:62px;cursor:pointer;font:inherit;color:inherit;tran
 button.die:disabled{cursor:default}
 button.die.held{border-color:var(--accent);transform:translateY(-6px)}
 button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);font-family:var(--display);font-size:.8rem;color:var(--on-accent);background:var(--accent);border-radius:999px;padding:0 8px}
-@media (max-width:420px){button.die{width:52px;height:52px}.dice{gap:8px}}
+@media (max-width:420px){button.die{width:48px;height:48px}.dice{gap:6px}}
 .pot{display:flex;justify-content:center;align-items:baseline;gap:10px}
 .pot b{font-family:var(--display);font-weight:400;font-size:1.6rem}
 .pot span{color:var(--muted);font-size:.85rem}
@@ -87,6 +87,8 @@ button.die.held::after{content:"고정";position:absolute;left:50%;bottom:-24px;
 .hand small{display:block;font-family:var(--body);font-size:.85rem;color:var(--muted)}
 .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .hint{text-align:center;color:var(--muted);font-size:.9rem;margin:0}
+.raise-pick{display:inline-flex;gap:6px;align-items:center}
+.btn.step{padding:10px 14px;min-width:44px}
 .banner{text-align:center;font-family:var(--display);font-size:1.15rem;background:var(--card);border-radius:14px;padding:10px 14px}
 .banner.win{background:var(--good);color:var(--card)}
 .log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:.88rem;color:var(--muted)}

@@ -10,6 +10,8 @@ let token = null;
 try { token = localStorage.getItem('dh.token'); } catch {}
 let profile = null, rooms = [], state = null, conn = null, devGrant = false;
 let held = [false,false,false,false,false], heldKey = '', clockOffset = 0;
+// 고른 레이즈 크기(이번 판 누적). 판이 바뀌면 기본 크기로 돌아간다
+let raiseTo = 0, raiseKey = '';
 
 // ---------- 서버 호출 ----------
 
@@ -122,6 +124,8 @@ $('me').addEventListener('click', e => {
   const act = b.dataset.act;
   if (act === 'reroll') invoke('Reroll', held);
   else if (act === 'stand') invoke('Stand');
+  else if (act === 'raise-' || act === 'raise+') { raiseTo += (act === 'raise+' ? 1 : -1) * state.room.ante; render(); }
+  else if (act === 'raise') invoke('RaiseTo', raiseTo);
   else invoke('Bet', act);
 });
 
@@ -228,11 +232,20 @@ function renderGame() {
     }
   } else if (s.phase === 'betting') {
     if (me.myTurn) {
+      const ante = s.room.ante;
+      const key = s.roundNo + ':' + me.minRaise + ':' + me.maxRaise;
+      if (key !== raiseKey) { raiseKey = key; raiseTo = s.room.raiseTotal; }
+      if (me.canRaise) raiseTo = Math.max(me.minRaise, Math.min(me.maxRaise, raiseTo));
+      const times = n => `${+(n / ante).toFixed(1)}배`;
       hint = me.responding ? '뒤에서 레이즈(올리기)가 나왔습니다. 차액을 내고 콜할까요?'
-        : `배수는 앤티 기준. 레이즈(올리기)는 판당 한 명만, ${esc(me.raiseTimes)}까지.`;
+        : me.raiseUsed ? '이번 판 레이즈(올리기)는 이미 나왔습니다. 콜하거나 폴드하세요.'
+        : `배수는 앤티 기준. 레이즈(올리기)는 판당 한 명만, −/+로 ${me.canRaise ? `${times(me.minRaise)}~${times(me.maxRaise)}` : '크기를'} 고릅니다.`;
       controls = `<button class="btn" data-act="fold">폴드 (포기)</button>
         <button class="btn primary" data-act="call" ${me.canCall ? '' : 'disabled'}>콜 (따라가기)<small>+${fmt(me.callCost)} · ${esc(me.callTimes)}</small></button>
-        ${me.raiseUsed || me.responding ? '' : `<button class="btn raise" data-act="raise" ${me.canRaise ? '' : 'disabled'}>레이즈 (올리기)<small>+${fmt(me.raiseCost)} · ${esc(me.raiseTimes)}</small></button>`}`;
+        ${me.raiseUsed || me.responding ? '' : `<span class="raise-pick">
+          <button class="btn step" data-act="raise-" aria-label="레이즈 줄이기" ${me.canRaise && raiseTo > me.minRaise ? '' : 'disabled'}>−</button>
+          <button class="btn raise" data-act="raise" ${me.canRaise ? '' : 'disabled'}>레이즈 (올리기)<small>${me.canRaise ? `+${fmt(raiseTo - me.contrib)} · ${times(raiseTo)}` : '머니가 모자랍니다'}</small></button>
+          <button class="btn step" data-act="raise+" aria-label="레이즈 늘리기" ${me.canRaise && raiseTo < me.maxRaise ? '' : 'disabled'}>+</button></span>`}`;
     } else {
       const t = s.seats.find(p => p.turn);
       hint = t ? `${t.name} 차례…` : '';
