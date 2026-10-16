@@ -108,6 +108,10 @@ $('exchangeBtn').addEventListener('click', async () => {
   try { profile = await api('/api/exchange', { amount: profile.exchangeUnit }); render(); }
   catch (err) { showError(err.message); }
 });
+$('rescueBtn').addEventListener('click', async () => {
+  try { profile = await api('/api/rescue', {}); render(); }
+  catch (err) { showError(err.message); }
+});
 $('grantBtn').addEventListener('click', async () => {
   try { profile = await api('/api/dev/grant', {}); render(); }
   catch (err) { showError(err.message); }
@@ -181,9 +185,14 @@ function renderLobby() {
   $('grantBtn').hidden = !devGrant;
 
   const canPlay = profile.money >= profile.buyIn;
+  const rb = $('rescueBtn');
+  rb.hidden = !profile.canRescue;
+  rb.innerHTML = `구제 머니 받기<small>${fmt(profile.buyIn)}까지 채움 · 하루 한 번</small>`;
   $('lobbyNote').textContent =
     `방에 앉으면 사이버머니 ${fmt(profile.buyIn)}을 테이블로 가져가고, 일어나면 남은 만큼 돌려받습니다.`
-    + (canPlay ? '' : ' 지금은 사이버머니가 모자랍니다. PC 게임(싱글)에서 칩을 벌어 환전하면 채울 수 있습니다.');
+    + (canPlay ? '' : profile.canRescue
+      ? ' 지금은 사이버머니가 모자랍니다. [구제 머니 받기]로 채우거나, PC 게임(싱글)에서 칩을 벌어 환전하세요.'
+      : ' 지금은 사이버머니가 모자랍니다. 구제 머니는 하루 한 번이라 내일(한국 시간 자정 뒤) 다시 받을 수 있고, PC 게임(싱글)에서 칩을 벌어 환전해도 됩니다.');
   $('createForm').querySelector('button').disabled = !canPlay;
 
   $('rooms').innerHTML = rooms.length ? rooms.map(r => `

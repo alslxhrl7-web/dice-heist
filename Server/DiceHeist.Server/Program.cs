@@ -134,6 +134,14 @@ app.MapPost("/api/single/stand", (HttpRequest req) => Single(req, single.Stand))
 app.MapPost("/api/single/bet", (HttpRequest req, BetRequest b) => Single(req, uid => single.Bet(uid, b?.Action, b?.RaiseTo ?? 0)));
 app.MapPost("/api/single/leave", (HttpRequest req) => Single(req, single.Leave));
 
+app.MapPost("/api/rescue", (HttpRequest req) =>
+{
+    if (Auth(req) is not long uid) return Results.Unauthorized();
+    if (rooms.IsInRoom(uid)) return Results.BadRequest(new { error = "테이블에서 일어난 뒤에 받을 수 있습니다." });
+    var err = db.ClaimRescue(uid, Room.BuyIn, DateTimeOffset.UtcNow);
+    return err != null ? Results.BadRequest(new { error = err }) : Profile(uid);
+});
+
 app.MapPost("/api/exchange", (HttpRequest req, ExchangeRequest e) =>
 {
     if (Auth(req) is not long uid) return Results.Unauthorized();

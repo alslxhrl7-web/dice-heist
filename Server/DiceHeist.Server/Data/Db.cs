@@ -11,6 +11,8 @@ namespace DiceHeist.Server.Data
         public int Chips;
         public long Money;
         public bool BronzeCleared;
+        /// <summary>마지막으로 구제 머니를 받은 때. 받은 적 없으면 null.</summary>
+        public DateTimeOffset? LastRescue;
     }
 
     /// <summary>
@@ -105,9 +107,9 @@ CREATE TABLE IF NOT EXISTS ledger (
 
         static string Now() => DateTimeOffset.UtcNow.ToString("O");
 
-        static void Ledger(SqliteConnection c, SqliteTransaction tx, long userId, string kind, long chips, long money) =>
+        static void Ledger(SqliteConnection c, SqliteTransaction tx, long userId, string kind, long chips, long money, DateTimeOffset? at = null) =>
             Exec(c, tx, "INSERT INTO ledger(user_id, kind, chips, money, at) VALUES ($u, $k, $c, $m, $t)",
-                ("$u", userId), ("$k", kind), ("$c", chips), ("$m", money), ("$t", Now()));
+                ("$u", userId), ("$k", kind), ("$c", chips), ("$m", money), ("$t", at?.ToUniversalTime().ToString("O") ?? Now()));
 
         // ---------- 계정 ----------
 
@@ -157,13 +159,15 @@ CREATE TABLE IF NOT EXISTS ledger (
         {
             using var c = Open();
             using var cmd = c.CreateCommand();
-            cmd.CommandText = "SELECT id, name, chips, money, bronze_cleared FROM users WHERE id = $id";
+            cmd.CommandText = "SELECT id, name, chips, money, bronze_cleared, " +
+                "(SELECT MAX(at) FROM ledger WHERE user_id = users.id AND kind = 'rescue') FROM users WHERE id = $id";
             cmd.Parameters.AddWithValue("$id", id);
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return null;
             return new UserRow
             {
                 Id = r.GetInt64(0), Name = r.GetString(1), Chips = r.GetInt32(2), Money = r.GetInt64(3), BronzeCleared = r.GetInt32(4) == 1,
+                LastRescue = r.IsDBNull(5) ? null : DateTimeOffset.Parse(r.GetString(5), System.Globalization.CultureInfo.InvariantCulture),
             };
         }
 
@@ -214,6 +218,27 @@ CREATE TABLE IF NOT EXISTS ledger (
             Exec(c, null, "UPDATE users SET chips = $c, bronze_cleared = MAX(bronze_cleared, $b) WHERE id = $u",
                 ("$c", chips), ("$b", clearsBronze ? 1 : 0), ("$u", userId));
             return Convert.ToInt32(Scalar(c, null, "SELECT bronze_cleared FROM users WHERE id = $u", ("$u", userId))) == 1;
+        }
+
+        /// <summary>
+        /// 구제 머니: 머니가 target보다 적고 테이블에 앉아 있지 않으면 하루(한국 시간) 한 번 target까지 채운다.
+        /// 브라우저로만 하는 사람은 칩을 벌 곳이 없어, 다 잃으면 다시 앉을 수 없었다(싱글의 구제 칩과 같은 역할). 실패하면 이유를 돌려준다.
+        /// </summary>
+        public string ClaimRescue(long userId, long target, DateTimeOffset now)
+        {
+            var u = GetUser(userId);
+            using var c = Open();
+            using var tx = c.BeginTransaction();
+            if (Scalar(c, tx, "SELECT 1 FROM stacks WHERE user_id = $u", ("$u", userId)) != null) return "테이블에서 일어난 뒤에 받을 수 있습니다.";
+            if (u.Money >= target) return $"사이버머니가 {target:N0}보다 적을 때만 받을 수 있습니다.";
+            if (!Rescue.Available(u.Money, u.LastRescue, target, now)) return "오늘은 이미 받았습니다. 내일(자정 지나서) 다시 받을 수 있습니다.";
+            long give = target - u.Money;
+            // 같은 요청이 겹쳐도 한 번만 채워지게 머니가 그대로일 때만 바꾼다
+            if (Exec(c, tx, "UPDATE users SET money = $t WHERE id = $u AND money = $m", ("$t", target), ("$u", userId), ("$m", u.Money)) == 0)
+                return "잠시 뒤에 다시 시도해 주세요.";
+            Ledger(c, tx, userId, "rescue", 0, give, now);
+            tx.Commit();
+            return null;
         }
 
         /// <summary>개발용: 테스트 머니를 주고 브론즈를 지난 것으로 친다.</summary>
@@ -286,6 +311,17 @@ CREATE TABLE IF NOT EXISTS ledger (
             using var c = Open();
             return Convert.ToInt64(Scalar(c, null, "SELECT (SELECT COALESCE(SUM(money),0) FROM users) + (SELECT COALESCE(SUM(stack),0) FROM stacks)"));
         }
+    }
+
+    /// <summary>구제 머니를 받을 수 있는지. 하루의 경계는 한국 시간 자정.</summary>
+    public static class Rescue
+    {
+        static readonly TimeSpan Kst = TimeSpan.FromHours(9);
+
+        public static DateOnly Day(DateTimeOffset t) => DateOnly.FromDateTime(t.ToOffset(Kst).DateTime);
+
+        public static bool Available(long money, DateTimeOffset? last, long target, DateTimeOffset now) =>
+            money < target && (last == null || Day(last.Value) != Day(now));
     }
 
     public static class Passwords
