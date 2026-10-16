@@ -35,7 +35,7 @@ h1{font-family:var(--display);font-weight:400;font-size:1.9rem;margin:0;line-hei
 .opp.turn{border-color:var(--accent)}
 .opp.out{opacity:.55}
 .opp.win{border-color:var(--good)}
-.avatar{width:50px;height:50px;border-radius:50%;background:var(--felt);display:grid;place-items:center;font-size:28px}
+.avatar{width:50px;height:50px;border-radius:50%;background-color:var(--felt);background-repeat:no-repeat;background-size:230%;background-position:50% 30%;flex:none}
 .opp-body{min-width:0;display:flex;flex-direction:column;gap:6px}
 .opp-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .opp-top strong{font-family:var(--display);font-weight:400;font-size:1.15rem}
@@ -65,7 +65,7 @@ h1{font-family:var(--display);font-weight:400;font-size:1.9rem;margin:0;line-hei
 .me.turn{border-color:var(--accent)}
 .me.win{border-color:var(--good)}
 .me-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.me-top .avatar{width:40px;height:40px;font-size:22px}
+.me-top .avatar{width:40px;height:40px}
 .me-top strong{font-family:var(--display);font-weight:400;font-size:1.15rem}
 .dice{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding-bottom:18px}
 button.die{width:66px;height:66px;cursor:pointer;font:inherit;color:inherit;transition:transform .15s}
@@ -148,11 +148,13 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sleep = ms => new Promise(r => setTimeout(r, reduceMotion ? Math.min(ms, 120) : ms));
 const d6 = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return 1 + (a[0] % 6); };
 const IDX = [0,1,2,3,4];
+// 캐릭터 얼굴: VARCO로 만든 그림(Assets/Art/Characters)에서 얼굴 쪽만 둥글게 잘라 보인다. 이모지 대신
+const faceStyle = id => `background-image:url('../Assets/Art/Characters/${id}.png')`;
 
 const players = [
-  {id:'me',  name:'나',     face:'🐰', chips:1000, ai:false},
-  {id:'rac', name:'너구리', face:'🦝', chips:1000, ai:true, bluff:0.25, loose:0.7,  tag:'능글맞은 블러퍼'},
-  {id:'cat', name:'고양이', face:'🐱', chips:1000, ai:true, bluff:0.07, loose:0.45, tag:'냉정한 계산형'},
+  {id:'me',  name:'나',     face:'rabbit', chips:1000, ai:false},
+  {id:'rac', name:'너구리', face:'raccoon', chips:1000, ai:true, bluff:0.25, loose:0.7,  tag:'능글맞은 블러퍼'},
+  {id:'cat', name:'고양이', face:'cat', chips:1000, ai:true, bluff:0.07, loose:0.45, tag:'냉정한 계산형'},
 ];
 const me = players[0];
 players.forEach(p => Object.assign(p, {dice:[1,2,3,4,5], held:[false,false,false,false,false], rerolls:0, folded:false, contrib:0, status:'대기', revealed:false, winner:false, rolling:false, rollIdx:[]}));
@@ -364,7 +366,7 @@ function render(){
 
   document.getElementById('opps').innerHTML = players.filter(p => p.ai).map(p => `
     <div class="opp ${turn === p ? 'turn' : ''} ${p.folded ? 'out' : ''} ${p.winner ? 'win' : ''}">
-      <div class="avatar" aria-hidden="true">${p.face}</div>
+      <div class="avatar" aria-hidden="true" style="${faceStyle(p.face)}"></div>
       <div class="opp-body">
         <div class="opp-top"><strong>${p.name}</strong><span class="tag">${p.tag}</span></div>
         <div class="meta"><span class="num">${p.chips.toLocaleString()}칩</span>
@@ -418,7 +420,7 @@ function render(){
   const meEl = document.getElementById('me');
   meEl.className = 'me' + (turn === me && ['hold','bet','respond'].includes(phase) ? ' turn' : '') + (me.winner ? ' win' : '');
   meEl.innerHTML = `
-    <div class="me-top"><div class="avatar" aria-hidden="true">${me.face}</div><strong>나</strong>
+    <div class="me-top"><div class="avatar" aria-hidden="true" style="${faceStyle(me.face)}"></div><strong>나</strong>
       <span class="pill">리롤 ${me.rerolls}회</span>${statusPill(me)}
       ${players[starter] === me && roundNo ? '<span class="pill first">선</span>' : ''}</div>
     <div class="dice">${me.dice.map((v, i) => `<button class="die ${me.held[i] ? 'held' : ''} ${me.rolling && me.rollIdx.includes(i) ? 'rolling' : ''} ${parts[i] && phase !== 'rolling' ? 'part' : ''}"
