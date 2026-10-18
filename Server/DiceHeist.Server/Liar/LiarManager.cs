@@ -80,6 +80,32 @@ namespace DiceHeist.Server.Liar
             }
         }
 
+        /// <summary>
+        /// 빠른 시작: 사람이 기다리고 있는 방(빈자리 있음) → 게임 중이라도 빈자리 있는 방(다음 게임부터) → 새 방 순으로 앉는다.
+        /// 봇이 차지한 자리는 사람에게 비켜 준다. 혼자여도 봇과 바로 시작한다.
+        /// </summary>
+        public string QuickStart(long userId, string connectionId)
+        {
+            lock (_gate)
+            {
+                if (RoomOf(userId) != null) return "이미 방에 앉아 있습니다.";
+                var pick = _rooms.Values
+                    .Where(r => r.HumanCount < LiarRoom.MaxSeats && (r.Seats.Count < LiarRoom.MaxSeats || r.Seats.Any(s => s.IsBot && !r.InGame(s))))
+                    .OrderBy(r => r.Phase == "waiting" || r.Phase == "countdown" ? 0 : 1)
+                    .ThenByDescending(r => r.HumanCount)
+                    .FirstOrDefault();
+                if (pick == null)
+                {
+                    pick = new LiarRoom("L" + (++_nextId), "빠른 시작 테이블", _timings, _rng);
+                    _rooms[pick.Id] = pick;
+                }
+                var err = SitUnlocked(userId, pick, connectionId);
+                if (err != null && pick.HumanCount == 0) _rooms.Remove(pick.Id);
+                else Publish(pick);
+                return err;
+            }
+        }
+
         public string Join(long userId, string roomId, string connectionId)
         {
             lock (_gate)
@@ -94,7 +120,7 @@ namespace DiceHeist.Server.Liar
         string SitUnlocked(long userId, LiarRoom room, string connectionId)
         {
             if (RoomOf(userId) != null) return "이미 다른 방에 앉아 있습니다.";
-            if (room.Seats.Count >= LiarRoom.MaxSeats) return "방이 꽉 찼습니다.";
+            if (!room.MakeRoomForHuman()) return "방이 꽉 찼습니다.";
             var user = _db.GetUser(userId);
             if (user == null) return "계정을 찾을 수 없습니다.";
             // 예전 멀티(주사위 포커) 테이블에 앉아 있으면 머니가 거기 있다(stacks는 한 사람에 한 줄)
@@ -208,11 +234,12 @@ namespace DiceHeist.Server.Liar
             _db.RecordRounds(room.TakeRecords());
             foreach (var s in room.Seats)
             {
-                if (s.Stack == s.SavedStack) continue;
+                if (s.IsBot || s.Stack == s.SavedStack) continue;
                 _db.UpdateStack(s.UserId, s.Stack);
                 s.SavedStack = s.Stack;
             }
-            if (room.Seats.Count == 0) _rooms.Remove(room.Id);
+            // 사람이 모두 떠나면 봇만 남은 방은 닫는다
+            if (room.HumanCount == 0) _rooms.Remove(room.Id);
             else _notify?.Room(room, _now());
 
             var lobby = LobbyUnlocked();

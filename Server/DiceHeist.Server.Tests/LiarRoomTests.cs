@@ -11,7 +11,7 @@ namespace DiceHeist.Server.Tests
         DateTimeOffset _now;
         LiarRoom _room;
         LiarSeat _a, _b, _c;
-        static readonly LiarTimings T = new LiarTimings();
+        static readonly LiarTimings T = new LiarTimings { BotFillTo = 0 }; // 이 테스트들은 사람끼리만(봇은 LiarBotTests)
 
         [SetUp]
         public void SetUp()

@@ -49,6 +49,7 @@ liarTimings.Countdown = TimeSpan.FromSeconds(liarCfg.GetValue("CountdownSeconds"
 liarTimings.Turn = TimeSpan.FromSeconds(liarCfg.GetValue("TurnSeconds", liarTimings.Turn.TotalSeconds));
 liarTimings.Lever = TimeSpan.FromSeconds(liarCfg.GetValue("LeverSeconds", liarTimings.Lever.TotalSeconds));
 liarTimings.Double = TimeSpan.FromSeconds(liarCfg.GetValue("DoubleSeconds", liarTimings.Double.TotalSeconds));
+liarTimings.BotFillTo = liarCfg.GetValue("BotFillTo", liarTimings.BotFillTo);
 builder.Services.AddSingleton(liarTimings);
 builder.Services.AddSingleton<DiceHeist.Server.Liar.LiarConnections>();
 builder.Services.AddSingleton(sp => new DiceHeist.Server.Liar.LiarManager(sp.GetRequiredService<Db>(), liarTimings));

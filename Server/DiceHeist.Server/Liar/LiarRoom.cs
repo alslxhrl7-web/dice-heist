@@ -18,6 +18,8 @@ namespace DiceHeist.Server.Liar
         public TimeSpan Double = TimeSpan.FromSeconds(12);
         public TimeSpan DoubleRoll = TimeSpan.FromSeconds(3);
         public TimeSpan Result = TimeSpan.FromSeconds(7);
+        /// <summary>사람이 있을 때 봇이 이 인원까지 자리를 채운다(0이면 봇 없음). 설정 Liar:BotFillTo</summary>
+        public int BotFillTo = LiarRoom.FillTo;
     }
 
     public sealed class LiarSeat
@@ -37,7 +39,10 @@ namespace DiceHeist.Server.Liar
         /// <summary>관전 베팅: 건 자리(이 방 Seats 기준 사용자 id), 금액, 배당(건 때의 생존자 수).</summary>
         public long SideTarget;
         public int SideAmount, SideOdds;
-        public bool Connected => ConnectionId != null;
+        /// <summary>빈자리를 채우는 봇(화면에 "봇"으로 보인다). 머니는 카지노 돈이라 DB에 남지 않고, 사용자 id는 음수.</summary>
+        public bool IsBot;
+        /// <summary>봇은 늘 연결된 것으로 친다.</summary>
+        public bool Connected => IsBot || ConnectionId != null;
         public int EmoteKind = -1, EmoteSeq;
         public DateTimeOffset EmoteAt;
     }
@@ -58,6 +63,11 @@ namespace DiceHeist.Server.Liar
         public static readonly int[] SideBetAmounts = { 1_000, 5_000, 10_000 };
         /// <summary>더블 오어 낫싱: 금고 주사위 4~6이면 두 배, 1~3이면 0. 연달아 최대 몇 번.</summary>
         public const int MaxDoubles = 3, DoubleWinFrom = 4;
+        /// <summary>사람이 한 명이라도 앉아 있으면, 게임을 시작할 때 이 인원이 될 때까지 봇이 자리를 채운다(2026-10-19 빠른 시작). 사람 자리 2개는 늘 남긴다.</summary>
+        public const int FillTo = 4;
+        /// <summary>봇이 생각하는 시간(차례·레버). 사람처럼 잠깐 뜸을 들인다.</summary>
+        public static readonly TimeSpan BotThink = TimeSpan.FromSeconds(1.8), BotPull = TimeSpan.FromSeconds(1.6);
+        static readonly string[] BotAnimals = { "raccoon", "cat", "fox", "bear", "rabbit" };
 
         public static readonly string[] Emotes = { "👍", "😱", "ㅋㅋ", "🤥", "🙏", "거짓말!" };
         public static readonly TimeSpan EmoteShown = TimeSpan.FromSeconds(3), EmoteGap = TimeSpan.FromSeconds(2);
@@ -99,7 +109,7 @@ namespace DiceHeist.Server.Liar
 
         public List<Data.RoundRecord> TakeRecords()
         {
-            var list = _records.ToList();
+            var list = _records.Where(r => r.UserId > 0).ToList(); // 봇(음수 id)은 기록하지 않는다
             _records.Clear();
             return list;
         }
@@ -168,6 +178,7 @@ namespace DiceHeist.Server.Liar
                 case "waiting":
                 case "countdown":
                 {
+                    ManageBots();
                     var ready = Ready();
                     if (ready.Count < 2) { Phase = "waiting"; Deadline = null; }
                     else if (Phase == "waiting") { Phase = "countdown"; Deadline = now + _t.Countdown; }
@@ -175,7 +186,8 @@ namespace DiceHeist.Server.Liar
                     break;
                 }
                 case "bid":
-                    if (now >= Deadline)
+                    if (SeatOf(_game.Turn).IsBot && now >= Deadline - _t.Turn + BotThink && now < Deadline) BotTurn(now);
+                    else if (now >= Deadline)
                     {
                         // 시간 초과: 거짓말을 외칠 수 있으면 외치고, 아니면 가장 작게 올려 부른다
                         var s = SeatOf(_game.Turn);
@@ -188,13 +200,19 @@ namespace DiceHeist.Server.Liar
                     if (now >= Deadline) { Phase = "lever"; Deadline = now + _t.Lever; }
                     break;
                 case "lever":
-                    if (now >= Deadline) DoPull(now);
+                    if (now >= Deadline || (SeatOf(_game.PendingPull)?.IsBot == true && now >= Deadline - _t.Lever + BotPull)) DoPull(now);
                     break;
                 case "fall":
                     if (now >= Deadline) NextRoundOrWin(now);
                     break;
                 case "double":
-                    if (now >= Deadline) Collect(now);
+                    if (_winner.IsBot && now >= Deadline - _t.Double + BotPull)
+                    {
+                        // 봇도 가끔 금고 주사위를 굴린다(사람들이 봇의 운도 구경하게)
+                        if (_doubles == 0 && _rng.NextDouble() < 0.35) Double(_winner, now);
+                        else Collect(now);
+                    }
+                    else if (now >= Deadline) Collect(now);
                     break;
                 case "doubleRoll":
                     if (now >= Deadline)
@@ -211,6 +229,56 @@ namespace DiceHeist.Server.Liar
         }
 
         List<LiarSeat> Ready() => Seats.Where(s => s.Connected && !s.Leaving && s.Stack >= Ante).ToList();
+
+        // ---------- 봇 ----------
+
+        public int HumanCount => Seats.Count(s => !s.IsBot);
+        int _botNo;
+
+        /// <summary>
+        /// 게임 사이에 봇 자리를 맞춘다: 사람이 없으면 봇을 모두 내보내고, 사람이 있으면 FillTo명이 될 때까지 채우고 넘치면 줄인다.
+        /// 머니가 바닥난 봇은 카지노가 다시 채워 준다.
+        /// </summary>
+        void ManageBots()
+        {
+            if (HumanCount == 0)
+            {
+                Seats.RemoveAll(s => s.IsBot);
+                return;
+            }
+            int fill = Math.Min(_t.BotFillTo, MaxSeats - 2); // 사람 자리 2개는 늘 남긴다
+            while (Seats.Count > fill && Seats.Any(s => s.IsBot))
+                Seats.Remove(Seats.Last(s => s.IsBot));
+            while (Seats.Count < fill)
+            {
+                _botNo++;
+                string animal = BotAnimals[(_botNo - 1) % BotAnimals.Length];
+                Seats.Add(new LiarSeat
+                {
+                    UserId = -_botNo, IsBot = true, Name = $"봇 {Characters.NameOf(animal)}{_botNo}", Character = animal,
+                    Stack = BuyIn, SavedStack = BuyIn,
+                });
+            }
+            foreach (var b in Seats.Where(s => s.IsBot && s.Stack < Ante)) b.Stack = BuyIn;
+        }
+
+        /// <summary>사람이 앉으려는데 자리가 꽉 찼으면, 게임에 끼지 않은 봇 하나를 내보내 자리를 만든다.</summary>
+        public bool MakeRoomForHuman()
+        {
+            if (Seats.Count < MaxSeats) return true;
+            var bot = Seats.LastOrDefault(s => s.IsBot && !InGame(s) && s != _winner);
+            if (bot == null) return false;
+            Seats.Remove(bot);
+            return true;
+        }
+
+        void BotTurn(DateTimeOffset now)
+        {
+            var (challenge, bid) = LiarBot.Decide(_game, _game.Turn, _rng);
+            if (!challenge && _game.CheckBid(bid) != null) challenge = _game.CanChallenge;
+            if (challenge) DoChallenge(now);
+            else DoRaise(bid, now);
+        }
 
         void StartGame(DateTimeOffset now, List<LiarSeat> ready)
         {
@@ -327,7 +395,8 @@ namespace DiceHeist.Server.Liar
 
         List<LiarSeat> EndGame()
         {
-            var removed = Seats.Where(s => s.Leaving || !s.Connected || s.Stack < Ante).ToList();
+            // 봇은 여기서 일어나지 않는다(머니가 바닥나면 ManageBots가 채운다)
+            var removed = Seats.Where(s => !s.IsBot && (s.Leaving || !s.Connected || s.Stack < Ante)).ToList();
             foreach (var s in removed)
             {
                 Seats.Remove(s);
@@ -423,7 +492,7 @@ namespace DiceHeist.Server.Liar
 
         public object Summary() => new
         {
-            id = Id, name = Name, players = Seats.Count, maxPlayers = MaxSeats, ante = Ante, buyIn = BuyIn,
+            id = Id, name = Name, players = HumanCount, bots = Seats.Count - HumanCount, maxPlayers = MaxSeats, ante = Ante, buyIn = BuyIn,
             phase = Phase == "waiting" || Phase == "countdown" ? "waiting" : "playing",
         };
 
@@ -478,6 +547,7 @@ namespace DiceHeist.Server.Liar
                     return new
                     {
                         userId = s.UserId,
+                        isBot = s.IsBot,
                         name = s.Name,
                         character = s.Character,
                         hat = s.Hat,

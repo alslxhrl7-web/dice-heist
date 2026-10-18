@@ -12,6 +12,8 @@ namespace DiceHeist.Server.Tests
     /// <summary>실제 서버(메모리 안)에서 라이어 다이스 한 게임을 허브로 끝까지 두고, 가챠 API를 불러 본다.</summary>
     public class LiarFlowTests
     {
+        /// <summary>봇 채우기 인원(테스트마다 바꾼다). 기본은 사람끼리만.</summary>
+        string BotFill = "0";
         WebApplicationFactory<Program> _factory;
         string _dbPath;
 
@@ -24,6 +26,7 @@ namespace DiceHeist.Server.Tests
                 b.UseSetting("Db:Path", _dbPath);
                 b.UseSetting("Db:BackupDir", _dbPath + "-backups");
                 b.UseSetting("Liar:CountdownSeconds", "0.2");
+                b.UseSetting("Liar:BotFillTo", BotFill);
             });
         }
 

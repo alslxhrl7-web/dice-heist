@@ -116,6 +116,8 @@ namespace DiceHeist.Server.Liar
 
         public string CreateRoom(string name) => _rooms.Create(UserId, name, Context.ConnectionId);
         public string JoinRoom(string roomId) => _rooms.Join(UserId, roomId, Context.ConnectionId);
+        /// <summary>빠른 시작: 빈자리가 있는 방에 바로 앉는다(없으면 새 방, 모자라면 봇이 채운다).</summary>
+        public string QuickStart() => _rooms.QuickStart(UserId, Context.ConnectionId);
         public string LeaveRoom() => _rooms.Leave(UserId);
         public string Emote(int kind) => _rooms.Emote(UserId, kind);
         /// <summary>"face 눈이 quantity개 이상".</summary>

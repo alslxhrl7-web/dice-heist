@@ -173,6 +173,7 @@ renderMute();
 // ---------- 로비 ----------
 
 $('createForm').addEventListener('submit', e => { e.preventDefault(); invoke('CreateRoom', $('roomName').value.trim()); });
+$("quickBtn").addEventListener("click", () => invoke("QuickStart"));
 $('rooms').addEventListener('click', e => { const b = e.target.closest('[data-join]'); if (b) invoke('JoinRoom', b.dataset.join); });
 $('rescueBtn').addEventListener('click', async () => {
   try { profile = await api('/api/rescue', {}); render(); } catch (err) { showError(err.message); }
@@ -253,8 +254,9 @@ function renderLobby() {
   $('lobbyNote').textContent = '방에 앉으면 사이버머니 50,000을 테이블로 가져가고, 게임마다 참가비 5,000을 냅니다. 일어나면 남은 만큼 돌려받습니다.'
     + (canPlay ? '' : ' 지금은 사이버머니가 모자랍니다.');
   $('createForm').querySelector('button').disabled = !canPlay;
+  $("quickBtn").disabled = !canPlay;
   $('rooms').innerHTML = rooms.length ? rooms.map(r => `
-    <li><div><strong>${esc(r.name)}</strong> <span class="pill num">${r.players}/${r.maxPlayers}명</span>
+    <li><div><strong>${esc(r.name)}</strong> <span class="pill num">사람 ${r.players}명${r.bots ? ` · 봇 ${r.bots}` : ""}</span>
       <span class="pill ${r.phase === 'waiting' ? '' : 'red'}">${r.phase === 'waiting' ? '대기 중' : '게임 중'}</span>
       <span class="note num">참가비 ${fmt(r.ante)} · 바이인 ${fmt(r.buyIn)}</span></div>
       <button class="btn primary" data-join="${esc(r.id)}" ${!canPlay || r.players >= r.maxPlayers ? 'disabled' : ''}>앉기</button></li>`).join('')
@@ -289,7 +291,7 @@ function seatCard(p, i, open) {
     : p.inGame ? '<span class="pill red">풍덩! 탈락</span>' : '<span class="pill">다음 게임부터</span>';
   const side = p.side ? `<span class="side">관전 베팅: ${esc(s.seats[p.side.target]?.name)}에 ${fmt(p.side.amount)} (${p.side.odds}배)</span>` : '';
   return `<div class="${cls}">${bubble(p)}${avatar(p)}
-    <span class="name">${esc(p.name)}</span><span class="stack num">${fmt(p.stack)}</span>
+    <span class="name">${esc(p.name)}${p.isBot ? ' <span class="pill">봇</span>' : ""}</span><span class="stack num">${fmt(p.stack)}</span>
     ${!p.connected ? '<span class="pill">연결 끊김</span>' : ''}${chance}${dice}${side}</div>`;
 }
 

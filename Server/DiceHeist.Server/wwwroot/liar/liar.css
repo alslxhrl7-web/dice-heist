@@ -146,3 +146,5 @@ dialog::backdrop{background:rgba(5,3,10,.7)}
 .inventory .icon{font-size:1.6rem}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}
 @media (max-width:480px){.big-num{font-size:2.4rem}.callout{font-size:1.35rem}.face{width:44px;height:44px}.die.lg{width:48px;height:48px}}
+.quick{display:flex;justify-content:center;margin:12px 0}
+.quick .btn{width:100%;max-width:520px}

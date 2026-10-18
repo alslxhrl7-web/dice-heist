@@ -46,6 +46,53 @@ namespace DiceHeist.Core
         public override string ToString() => IsNone ? "-" : $"{Face} × {Quantity}개";
     }
 
+    /// <summary>
+    /// 라이어 다이스 봇의 판단(빈자리를 채우는 AI, 화면에 "봇"으로 표시된다). 남의 주사위는 보지 않는다:
+    /// 자기 주사위의 그 눈(1 포함) 개수 + 남의 주사위 수 × 1/3(그 눈이거나 1일 확률)을 기대 개수로 본다.
+    /// 앞 부르기가 기대보다 확실히 많으면 "거짓말!", 아니면 가장 그럴듯한 눈으로 한 단계 올리고, 가끔은 허세로 엉뚱한 눈을 부른다.
+    /// </summary>
+    public static class LiarBot
+    {
+        /// <summary>앞 부르기가 기대 개수를 이만큼 넘으면 거짓말을 외친다.</summary>
+        public const double DoubtMargin = 1.0;
+        /// <summary>허세: 이 확률로 기대가 낮은 눈을 부른다.</summary>
+        public const double BluffChance = 0.18;
+
+        public static double Expected(LiarGame g, int me, int face)
+        {
+            int mine = 0;
+            foreach (int d in g.Players[me].Dice) if (d == face || d == 1) mine++;
+            int others = g.DiceInPlay - LiarGame.DicePerPlayer;
+            return mine + others / 3.0;
+        }
+
+        /// <summary>차례인 봇의 선택: 거짓말이면 challenge = true, 아니면 부를 것.</summary>
+        public static (bool challenge, LiarBid bid) Decide(LiarGame g, int me, IRandom rng)
+        {
+            var cur = g.Bid;
+            if (g.CanChallenge && cur.Quantity > Expected(g, me, cur.Face) + DoubtMargin && rng.NextDouble() < 0.9)
+                return (true, default);
+
+            // 눈마다 앞 부르기를 넘는 가장 작은 개수와 그 그럴듯함(기대 - 개수)을 본다
+            LiarBid best = default;
+            double bestScore = double.MinValue;
+            bool bluff = rng.NextDouble() < BluffChance;
+            for (int f = LiarGame.MinFace; f <= LiarGame.MaxFace; f++)
+            {
+                int q = cur.IsNone ? 1 : (f > cur.Face ? cur.Quantity : cur.Quantity + 1);
+                // 첫 부르기는 기대의 70%쯤에서 시작한다(너무 낮으면 판이 늘어진다)
+                if (cur.IsNone) q = Math.Max(1, (int)Math.Floor(Expected(g, me, f) * 0.7));
+                if (q > g.DiceInPlay) continue;
+                double score = Expected(g, me, f) - q + (bluff ? rng.NextDouble() * 3 : rng.NextDouble() * 0.3);
+                if (score > bestScore) { bestScore = score; best = new LiarBid(q, f); }
+            }
+            // 어떤 부르기도 그럴듯하지 않고 거짓말을 외칠 수 있으면 외친다
+            if (g.CanChallenge && (best.IsNone || bestScore < -1.5)) return (true, default);
+            if (best.IsNone || g.CheckBid(best) != null) best = g.MinimumRaise();
+            return (false, best);
+        }
+    }
+
     /// <summary>"거짓말!"로 컵을 연 결과.</summary>
     public sealed class LiarReveal
     {
