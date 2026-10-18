@@ -153,6 +153,7 @@ namespace DiceHeist.Server.Liar
         public string Bid(long userId, int quantity, int face) => Act(userId, (r, s, now) => r.Bid(s, quantity, face, now));
         public string Challenge(long userId) => Act(userId, (r, s, now) => r.Challenge(s, now));
         public string Pull(long userId) => Act(userId, (r, s, now) => r.Pull(s, now));
+        public string Pass(long userId, long target) => Act(userId, (r, s, now) => r.Pass(s, target, now));
         public string SideBet(long userId, long target, int amount) => Act(userId, (r, s, now) => r.SideBet(s, target, amount));
         public string Double(long userId) => Act(userId, (r, s, now) => r.Double(s, now));
         public string Cash(long userId) => Act(userId, (r, s, now) => r.Cash(s, now));

@@ -51,6 +51,7 @@ Assets/DiceHeist/
 - 관전 베팅: 떨어진(또는 이번 게임에 안 낀) 사람이 살아 있는 사람에게 1,000/5,000/10,000을 게임마다 한 번. 맞히면 건 금액 × 건 때의 생존자 수(카지노 돈이라 머니 총합이 변한다)
 - 더블 오어 낫싱: 이긴 사람이 판돈을 금고 주사위에 건다. 4~6 두 배, 1~3 0, 연달아 최대 3번
 - 빠른 시작·봇(2026-10-19): 로비 "빠른 시작"(허브 `QuickStart`)은 대기 중인 방 → 게임 중이라도 빈자리 있는 방 → 새 방 순으로 앉힌다. 사람이 한 명이라도 있으면 게임 사이에 봇이 4명(`LiarTimings.BotFillTo`, 설정 Liar:BotFillTo, 0이면 끔)까지 채우고 사람 자리 2개는 남긴다. 사람이 오면 판에 안 낀 봇이 비켜 주고, 사람이 다 나가면 방이 닫힌다. 봇은 이름에 "봇"·화면에 봇 표시(숨기지 않는다), 음수 id, 머니는 카지노 돈이라 DB에 없고 기록도 안 남긴다. 판단은 Core `LiarBot`(자기 주사위 + 남의 주사위 × 1/3 기대 개수, 18% 허세), 차례·레버마다 1.6~1.8초 생각한 뒤 움직인다. 봇이 이기면 35% 확률로 금고 주사위를 한 번 굴린다
+- 떠넘기기 카드(2026-10-19): 레버를 잡은 사람(lever 단계)이 `LiarRoom.PassBaseCost`(1만)을 내고 살아 있는 다른 사람을 골라 레버를 넘긴다(허브 `Pass(target)`). 같은 레버를 또 넘기면 비용 두 배(1만→2만→4만), 한 레버에서 한 사람은 한 번만(Core `LiarGame.CanPass`·`PassLever`), 낸 돈은 판돈으로, 넘기면 레버 시간이 새로 시작. 넘겨받은 사람은 자기 칸 수로 당긴다. 모두에게 "떠넘겼다!" 알림(state.lastPass.seq). 봇은 자기 확률이 25% 이상이고 돈이 되면 70% 확률로 떨어질 확률이 가장 높은 사람에게 넘긴다
 - 가챠: `Server/DiceHeist.Server/gacha.json`(placeholder: true, 임시 확률·가격) → `GachaConfig`. 확률 = weight / 합, 화면에 그대로 보인다. `/api/gacha`(확률), `/api/gacha/me`, `/api/gacha/pull {count:1|10}`(테이블에 앉아 있으면 못 뽑음), `/api/gacha/equip {item}`. DB `inventory` 표. 쓴 꾸미기는 자리 얼굴 위 아이콘
 - 시험: `LiarDiceTests`(Core), `LiarRoomTests`·`LiarFlowTests`(서버, 허브로 한 게임 끝까지·가챠). 로컬 시험 서버는 `.claude/launch.json`의 `liar-dev`(5090, scratchpad DB)
 - 서버 PC(desktop-5omono1)에서 저장소를 받고 `Server\deploy\update-service.cmd`를 실행해야 서비스에 반영된다. 2026-10-18 작업 PC(P로딩)에도 시험 삼아 서비스가 설치돼 있다(외부 주소 없음, DB 비어 있음)

@@ -200,7 +200,8 @@ namespace DiceHeist.Server.Liar
                     if (now >= Deadline) { Phase = "lever"; Deadline = now + _t.Lever; }
                     break;
                 case "lever":
-                    if (now >= Deadline || (SeatOf(_game.PendingPull)?.IsBot == true && now >= Deadline - _t.Lever + BotPull)) DoPull(now);
+                    if (SeatOf(_game.PendingPull)?.IsBot == true && now >= Deadline - _t.Lever + BotPull && now < Deadline) BotLever(now);
+                    else if (now >= Deadline) DoPull(now);
                     break;
                 case "fall":
                     if (now >= Deadline) NextRoundOrWin(now);
@@ -294,6 +295,7 @@ namespace DiceHeist.Server.Liar
             _game = new LiarGame(_inGame.Select(s => s.Name).ToList(), _rng);
             _game.StartRound();
             _lastPull = null;
+            _lastPass = default;
             _winner = null;
             _vault = _doubles = _lastVaultRoll = 0;
             _banner = null;
@@ -441,6 +443,52 @@ namespace DiceHeist.Server.Liar
             return null;
         }
 
+        // ---------- 떠넘기기 카드(2026-10-19) ----------
+
+        /// <summary>떠넘기기 첫 비용. 같은 레버를 또 넘길 때마다 두 배(1만 → 2만 → 4만). 낸 돈은 판돈에 들어간다.</summary>
+        public const int PassBaseCost = 10_000;
+        /// <summary>봇은 떨어질 확률이 이 이상이고 돈이 되면 떠넘긴다.</summary>
+        public const double BotPassFrom = 0.25;
+
+        /// <summary>마지막 떠넘기기(화면 알림용). 누가 누구에게 얼마를 내고.</summary>
+        (LiarSeat from, LiarSeat to, int cost, int seq) _lastPass;
+        int _passSeq;
+
+        public int PassCost => PassBaseCost << (_game?.PassCount ?? 0);
+
+        /// <summary>레버를 잡은 사람이 돈을 내고 살아 있는 다른 사람(targetUserId)에게 레버를 떠넘긴다. 레버 시간은 새로 시작한다.</summary>
+        public string Pass(LiarSeat seat, long targetUserId, DateTimeOffset now)
+        {
+            if (Phase != "lever" || !InGame(seat) || _game.PendingPull != seat.GameIndex) return "지금은 레버를 떠넘길 수 없습니다.";
+            if (!_game.CanPass(seat.GameIndex)) return "이번 레버는 이미 한 번 떠넘겼습니다.";
+            int cost = PassCost;
+            if (seat.Stack < cost) return $"떠넘기려면 {cost:N0}이 있어야 합니다.";
+            var target = _inGame.FirstOrDefault(s => s.UserId == targetUserId);
+            if (target == null) return "살아 있는 사람에게만 떠넘길 수 있습니다.";
+            var err = _game.PassLever(target.GameIndex);
+            if (err != null) return err;
+            seat.Stack -= cost;
+            _pot += cost;
+            _lastPass = (seat, target, cost, ++_passSeq);
+            Log($"{seat.Name} · {cost:N0}을 내고 레버를 {target.Name}에게 떠넘겼다! ({target.Name} 떨어질 확률 {_game.Players[target.GameIndex].NextFallChance:P0})");
+            Deadline = now + _t.Lever;
+            return null;
+        }
+
+        /// <summary>봇이 레버를 잡았을 때: 떨어질 확률이 높고 돈이 되면, 살아 있는 사람 중 떨어질 확률이 가장 높은 사람에게 떠넘긴다. 아니면 당긴다.</summary>
+        void BotLever(DateTimeOffset now)
+        {
+            var bot = SeatOf(_game.PendingPull);
+            var me = _game.Players[bot.GameIndex];
+            if (_game.CanPass(bot.GameIndex) && me.NextFallChance >= BotPassFrom && bot.Stack >= PassCost + Ante && _rng.NextDouble() < 0.7)
+            {
+                var target = _inGame.Where(s => s != bot && _game.Players[s.GameIndex].Alive)
+                    .OrderByDescending(s => _game.Players[s.GameIndex].NextFallChance).ThenBy(s => s.IsBot ? 1 : 0).FirstOrDefault();
+                if (target != null && Pass(bot, target.UserId, now) == null) return;
+            }
+            DoPull(now);
+        }
+
         /// <summary>관전 베팅: 게임에서 떨어졌거나 이번 게임에 안 낀 사람이, 살아 있는 사람 중 누가 이길지 건다. 게임마다 한 번.</summary>
         public string SideBet(LiarSeat seat, long targetUserId, int amount)
         {
@@ -529,6 +577,8 @@ namespace DiceHeist.Server.Liar
                 },
                 // 레버를 당길 사람과 마지막 레버 결과
                 lever = g != null && g.PendingPull >= 0 ? Seats.IndexOf(SeatOf(g.PendingPull)) : -1,
+                // 마지막 떠넘기기(seq가 바뀌면 화면이 크게 알린다)
+                lastPass = _lastPass.from == null || g == null ? null : new { seq = _lastPass.seq, from = Seats.IndexOf(_lastPass.from), to = Seats.IndexOf(_lastPass.to), cost = _lastPass.cost },
                 lastPull = _lastPull == null || Phase != "fall" ? null : new
                 {
                     seat = Seats.IndexOf(SeatOf(_lastPull.Player)), pullNo = _lastPull.PullNo, chance = _lastPull.Chance, fell = _lastPull.Fell,
@@ -573,6 +623,8 @@ namespace DiceHeist.Server.Liar
                     canChallenge = myTurn && g.CanChallenge,
                     minBid = myTurn ? new { quantity = g.MinimumRaise().Quantity, face = g.MinimumRaise().Face } : null,
                     canPull = g != null && (Phase == "lever" || Phase == "reveal") && mine != null && g.PendingPull == mine.Index,
+                    canPass = g != null && Phase == "lever" && mine != null && g.CanPass(mine.Index) && viewer.Stack >= PassCost,
+                    passCost = g != null ? PassCost : 0,
                     canSideBet = g != null && !g.Over && (Phase == "bid" || Phase == "reveal" || Phase == "lever" || Phase == "fall")
                         && viewer.SideAmount == 0 && (mine == null || !mine.Alive),
                     canDouble = Phase == "double" && viewer == _winner,

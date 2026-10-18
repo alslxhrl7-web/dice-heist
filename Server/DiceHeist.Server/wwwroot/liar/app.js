@@ -117,8 +117,16 @@ function cue(prev, s) {
   if (s.phase === 'bid' && (!sameGame || prev.round !== s.round)) { Sound.play('shake'); fx.shakeCups = true; setTimeout(() => { fx.shakeCups = false; render(); }, 1100); }
   if (s.bid && (!prev.bid || prev.bid.quantity !== s.bid.quantity || prev.bid.face !== s.bid.face)) Sound.play('bid');
   if (s.phase === 'reveal' && prev.phase !== 'reveal') { Sound.play('liar'); setTimeout(() => Sound.play('reveal'), 450); }
+  // 떠넘기기: 새로 넘어왔으면 모두에게 크게 알리고, 나에게 넘어왔으면 심장 소리를 다시 시작한다
+  if (s.lastPass && s.lastPass.seq !== prev.lastPass?.seq) {
+    Sound.play("pass");
+    fx.pass = s.lastPass;
+    shakeTable();
+    setTimeout(() => { fx.pass = null; render(); }, 2600);
+  }
   if (s.phase === 'lever' && s.me.canPull && !prev.me.canPull) Sound.startHeart(me?.fallChance || 0.2);
   if (s.phase === 'lever' && !s.me.canPull && prev.phase !== 'lever') Sound.startHeart(0.1);
+  if (s.phase === "lever" && prev.me.canPull && !s.me.canPull) Sound.startHeart(0.1); // 내가 떠넘겼다: 구경하는 심장 소리로
   if (s.phase !== 'lever' && prev.phase === 'lever') Sound.stopHeart();
   if (s.phase === 'fall' && prev.phase !== 'fall' && s.lastPull) {
     Sound.stopHeart();
@@ -198,6 +206,7 @@ document.addEventListener('click', e => {
   else if (act === 'bid') invoke('Bid', pickQty, pickFace);
   else if (act === 'liar') invoke('Challenge');
   else if (act === 'pull') { Sound.stopHeart(); invoke('Pull'); }
+  else if (act === "pass") invoke("Pass", state.seats[+b.dataset.seat].userId);
   else if (act === 'side-target') { sideTarget = +b.dataset.seat; render(); }
   else if (act === 'side') invoke('SideBet', state.seats[sideTarget].userId, +b.dataset.amount);
   else if (act === 'double') invoke('Double');
@@ -302,6 +311,13 @@ function diceClass(v) {
   return v === r.face ? 'match' : v === 1 ? 'wild' : '';
 }
 
+/** 떠넘기기 카드: 살아 있는 다른 사람마다 버튼(그 사람의 떨어질 확률과 함께). */
+function passButtons(s) {
+  const targets = s.seats.map((p, i) => ({ p, i })).filter(x => x.i !== s.mySeat && x.p.inGame && x.p.alive);
+  return `<div class="pass"><span class="note">떠넘기기 카드 · ${fmt(s.me.passCost)}을 내고 레버를 넘긴다(낸 돈은 판돈으로, 다시 넘기면 두 배)</span>
+    <div class="controls">${targets.map(x => `<button class="btn" data-act="pass" data-seat="${x.i}">😈 ${esc(x.p.name)}에게<small>그 사람 확률 ${pct(x.p.fallChance)}</small></button>`).join("")}</div></div>`;
+}
+
 function name(i) { return esc(state.seats[i]?.name ?? '?'); }
 
 function centerView(s) {
@@ -315,10 +331,11 @@ function centerView(s) {
             <small>테이블 주사위 ${s.diceInPlay}개 · 1은 만능 · 다음은 ${name(turn)} 차례</small></div>`
         : `<div class="callout">${name(turn)}의 첫 부르기<small>테이블 주사위 ${s.diceInPlay}개 · 1은 만능</small></div>`;
     }
-    case 'reveal':
-    case 'lever': {
+    case "reveal":
+    case "lever": {
       const r = s.reveal;
-      if (!r) return '';
+      if (!r) return "";
+      if (fx.pass) return `<div class="boom fell">떠넘겼다!</div><div class="callout"><small>${name(fx.pass.from)}이(가) ${fmt(fx.pass.cost)}을 내고 레버를 ${name(fx.pass.to)}에게 넘겼다</small></div>`;
       const verdict = r.bidTrue
         ? `<div class="verdict truth">진짜였다! ${name(r.challenger)}의 헛짚기</div>`
         : `<div class="verdict liar">거짓말 들통! ${name(r.bidder)}</div>`;
@@ -329,7 +346,8 @@ function centerView(s) {
           <span>${name(s.lever)}이(가) 함정 레버를 잡았다…</span>
           <div class="odds">${pct(p.fallChance)}<small>떨어질 확률 (${p.pulls + 1}번째 당김)</small></div>
           <div class="chambers" aria-hidden="true">${Array.from({ length: 6 }, (_, k) => `<i class="${k < p.pulls ? 'used' : ''}"></i>`).join('')}</div>
-          ${s.me.canPull ? `<button class="btn red big" data-act="pull">함정 레버 당기기</button>` : ``}</div>`;
+          ${s.me.canPull ? `<button class="btn red big" data-act="pull">함정 레버 당기기</button>` : ``}
+          ${s.me.canPass ? passButtons(s) : ``}</div>`;
       }
       return `<div class="callout"><small>${name(r.challenger)}: "거짓말!"</small>
           ${die(r.face, 'md')} 눈(1 포함) <span class="big-num num">${r.count}</span> / 부른 개수 ${r.quantity}</div>${verdict}${lever}`;

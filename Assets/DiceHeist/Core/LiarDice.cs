@@ -228,6 +228,8 @@ namespace DiceHeist.Core
             };
             LastReveal = r;
             PendingPull = r.Loser;
+            _passed.Clear();
+            PassCount = 0;
             return r;
         }
 
@@ -243,10 +245,35 @@ namespace DiceHeist.Core
             return n;
         }
 
+        // ---------- 떠넘기기(2026-10-19) ----------
+
+        readonly HashSet<int> _passed = new HashSet<int>();
+
+        /// <summary>이번 레버에서 지금까지 떠넘긴 횟수(비용이 매번 두 배가 된다).</summary>
+        public int PassCount { get; private set; }
+
+        /// <summary>레버를 잡은 사람이 지금 떠넘길 수 있는지(한 레버에서 한 사람은 한 번만).</summary>
+        public bool CanPass(int from) => PendingPull == from && !_passed.Contains(from) && AliveCount() >= 2;
+
+        /// <summary>레버를 잡은 사람이 살아 있는 다른 사람(to)에게 레버를 떠넘긴다. 실패하면 이유.</summary>
+        public string PassLever(int to)
+        {
+            int from = PendingPull;
+            if (from < 0) return "레버를 잡은 사람이 없습니다.";
+            if (!CanPass(from)) return "이번 레버는 이미 한 번 떠넘겼습니다.";
+            if (to < 0 || to >= _players.Count || to == from || !_players[to].Alive) return "살아 있는 다른 사람에게만 떠넘길 수 있습니다.";
+            _passed.Add(from);
+            PassCount++;
+            PendingPull = to;
+            return null;
+        }
+
         /// <summary>진 사람이 레버를 당긴다. 떨어지면 탈락. 다음 판은 진 사람(살아 있으면)부터 부른다.</summary>
         public LiarPull Pull()
         {
             if (PendingPull < 0) throw new InvalidOperationException("레버를 당길 사람이 없습니다.");
+            _passed.Clear();
+            PassCount = 0;
             var p = _players[PendingPull];
             var res = new LiarPull { Player = p.Index, Chance = p.NextFallChance };
             p.Pulls++;

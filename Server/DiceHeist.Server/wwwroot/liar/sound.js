@@ -68,6 +68,8 @@ const Sound = (() => {
       const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t + 0.5); g.gain.exponentialRampToValueAtTime(0.6, t + 0.55); g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
       src.connect(lp).connect(g).connect(master); src.start(t + 0.5, 0, 1);
     },
+    // 떠넘기기: 휙 넘기는 소리와 낮은 웃음
+    pass() { const t = ctx.currentTime + 0.01; click(t, 1200, 0.4, 0.15, 1); tone(t + 0.12, 220, 0.18, 0.15, "sawtooth", 180); tone(t + 0.32, 200, 0.18, 0.15, "sawtooth", 160); tone(t + 0.52, 180, 0.3, 0.15, "sawtooth", 120); },
     // 살았다
     safe() { const t = ctx.currentTime + 0.02; [660, 880, 1320].forEach((f, i) => tone(t + i * 0.07, f, 0.25, 0.1, 'triangle')); },
     win() { const t = ctx.currentTime + 0.02; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(t + i * 0.09, f, 0.4, 0.12, 'triangle')); },

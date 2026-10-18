@@ -125,6 +125,8 @@ namespace DiceHeist.Server.Liar
         /// <summary>"거짓말!"</summary>
         public string Challenge() => _rooms.Challenge(UserId);
         public string Pull() => _rooms.Pull(UserId);
+        /// <summary>떠넘기기 카드: 돈을 내고 레버를 target(사용자 id)에게 넘긴다.</summary>
+        public string Pass(long target) => _rooms.Pass(UserId, target);
         /// <summary>관전 베팅: target은 걸 사람의 사용자 id(state.seats[].userId).</summary>
         public string SideBet(long target, int amount) => _rooms.SideBet(UserId, target, amount);
         public string Double() => _rooms.Double(UserId);
