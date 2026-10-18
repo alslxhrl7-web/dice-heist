@@ -41,6 +41,19 @@ Assets/DiceHeist/
 - 내 주사위가 멈췄을 때 스트레이트 이상(스트레이트·포 다이스·파이브 다이스)이면 `Celebration`이 화면 전체 축하(번쩍임·제목·색종이는 제목 뒤, 약 3초, 클릭은 막지 않음)를 띄운다. 한 판에 같은 족보로는 한 번만. 화면은 PlayMode 테스트가 `Logs/Shots/celebrate_*.png`로 남긴다
 - `GameBootstrap.useRandomSeed`를 끄면 `seed` 값으로 같은 판이 재현된다
 
+## 함정 의자 라이어 다이스 (2026-10-18, 브라우저 시제품)
+
+사용자 결정: 세븐포커·사기 도박은 재미가 약해 갈아엎고, "친구들과 하는, 도박성·중독성이 짙은 게임"으로. 순서는 핵심 판 → 관전 베팅 → 더블 오어 낫싱 → 가챠(확률·보상은 사용자가 나중에 gacha.json에 넣는다). 현금 결제·환전은 넣지 않는다(사행성 게임물 선, 사용자에게 안내함).
+
+- 주소: `/liar/`(화면 `wwwroot/liar/`: index.html·liar.css·app.js·sound.js), 허브 `/liarhub`. 예전 멀티(`/play/`, 주사위 포커)는 그대로 있다
+- 규칙(Core `LiarDice.cs`의 `LiarGame`, 공정한 주사위): 2~6명, 모두 컵 속 주사위 5개. 차례대로 "테이블 전체에 X 눈이 N개 이상"을 더 높게(개수↑ 또는 같은 개수에 큰 눈) 부르거나 "거짓말!". 1은 만능, 부를 수 있는 눈은 2~6. 틀린 쪽이 함정 레버: 사람마다 6칸 중 한 칸이 함정(시작 때 정함, 비밀) → 떨어질 확률 1/6 → 1/5 → … → 1, 떨어지면 탈락. 마지막 생존자 승. 다음 판은 진 사람부터
+- 방(`Server/.../Liar/LiarRoom.cs`): 바이인 50,000(stacks 표, 멀티와 같은 곳이라 한 사람은 한 테이블에만), 게임마다 참가비 5,000 → 판돈. 단계 waiting → countdown → bid(25초, 넘기면 거짓말 가능하면 거짓말·아니면 가장 작게) → reveal(4초) → lever(12초, 넘기면 자동으로 당김) → fall(3.5초) → … → double(12초, 넘기면 챙김) ⇄ doubleRoll → result
+- 관전 베팅: 떨어진(또는 이번 게임에 안 낀) 사람이 살아 있는 사람에게 1,000/5,000/10,000을 게임마다 한 번. 맞히면 건 금액 × 건 때의 생존자 수(카지노 돈이라 머니 총합이 변한다)
+- 더블 오어 낫싱: 이긴 사람이 판돈을 금고 주사위에 건다. 4~6 두 배, 1~3 0, 연달아 최대 3번
+- 가챠: `Server/DiceHeist.Server/gacha.json`(placeholder: true, 임시 확률·가격) → `GachaConfig`. 확률 = weight / 합, 화면에 그대로 보인다. `/api/gacha`(확률), `/api/gacha/me`, `/api/gacha/pull {count:1|10}`(테이블에 앉아 있으면 못 뽑음), `/api/gacha/equip {item}`. DB `inventory` 표. 쓴 꾸미기는 자리 얼굴 위 아이콘
+- 시험: `LiarDiceTests`(Core), `LiarRoomTests`·`LiarFlowTests`(서버, 허브로 한 게임 끝까지·가챠). 로컬 시험 서버는 `.claude/launch.json`의 `liar-dev`(5090, scratchpad DB)
+- 서버 PC(desktop-5omono1)에서 저장소를 받고 `ServerdeployPdate-service.cmd`를 실행해야 서비스에 반영된다. 2026-10-18 작업 PC(P로딩)에도 시험 삼아 서비스가 설치돼 있다(외부 주소 없음, DB 비어 있음)
+
 ## 멀티 서버 (Server/, 2026-10-14 1단계)
 
 C# ASP.NET Core + SignalR + SQLite. Core 파일을 그대로 링크해 컴파일하므로 규칙이 싱글과 같다. 브라우저 화면은 `wwwroot`(웹 프로토타입 스타일): `index.html` 소개 페이지, `play/` 멀티 화면. 소개 페이지는 `/api/config`(족보·테이블 등급·멀티 규칙)와 `/api/site`(열린 방 수·앉은 사람 수·zip 크기)를 읽는다. zip 위치는 설정 `Site:WindowsZip`(기본: 실행 파일 옆 `downloads/DiceHeist-Windows.zip`), 서비스 설치 스크립트가 `Builds/DiceHeist-Windows.zip`을 `C:\DiceHeist\downloads`로 복사한다. 주사위 눈은 SVG로 그린다(CSS 그리드는 `<button>` 안에서 칸이 0으로 접혀 눈이 안 보였다). 멀티 화면 효과음은 `play/sound.js`가 WebAudio로 합성한다(굴림·칩·폴드·공개·승패·내 차례, 음소거는 localStorage `dh.mute`). 상태가 바뀔 때 `cue`가 바로 전 상태와 비교해 소리를 고르고, 다른 탭을 보는 중에 내 차례면 탭 제목을 깜빡인다. 로비와 소개 페이지에 순위표(`/api/ranking`, 머니 + 테이블 stack 상위 10명) 족보 표는 `/api/config`의 hands(RankWeights 확률)로 그린다. 로컬 미리보기 서버는 5090 포트(5080은 서비스가 씀)

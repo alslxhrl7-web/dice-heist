@@ -63,6 +63,14 @@ CREATE TABLE IF NOT EXISTS multi_stats (
   best_rank INTEGER NOT NULL DEFAULT -1,
   biggest_pot INTEGER NOT NULL DEFAULT 0
 );
+-- 가챠로 얻은 꾸미기(사람마다 아이템마다 한 줄). equipped는 지금 쓰고 있는 것(사람마다 많아야 하나)
+CREATE TABLE IF NOT EXISTS inventory (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  item_id TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  equipped INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, item_id)
+);
 CREATE TABLE IF NOT EXISTS ledger (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
@@ -389,6 +397,65 @@ CREATE TABLE IF NOT EXISTS ledger (
                              "best_rank = MAX(best_rank, excluded.best_rank), biggest_pot = MAX(biggest_pot, excluded.biggest_pot)",
                     ("$u", r.UserId), ("$w", r.Won ? 1 : 0), ("$r", r.Rank), ("$p", r.Won ? r.Amount : 0));
             tx.Commit();
+        }
+
+        /// <summary>테이블(멀티·라이어 다이스 어느 쪽이든)에 머니를 가져가 앉아 있는지.</summary>
+        public bool HasStack(long userId)
+        {
+            using var c = Open();
+            return Scalar(c, null, "SELECT 1 FROM stacks WHERE user_id = $u", ("$u", userId)) != null;
+        }
+
+        // ---------- 가챠(꾸미기) ----------
+
+        /// <summary>
+        /// 가챠: 머니에서 cost를 빼고 items를 인벤토리에 더한다(한 트랜잭션). 머니가 모자라거나 테이블에 앉아 있으면 이유를 돌려준다.
+        /// 앉아 있을 때 막는 이유: 머니가 테이블 stack으로 나가 있어, 뽑기로 머니가 줄면 일어날 때 계산이 헷갈린다.
+        /// </summary>
+        public string GachaPull(long userId, long cost, IReadOnlyList<string> items)
+        {
+            using var c = Open();
+            using var tx = c.BeginTransaction();
+            if (Scalar(c, tx, "SELECT 1 FROM stacks WHERE user_id = $u", ("$u", userId)) != null) return "테이블에서 일어난 뒤에 뽑을 수 있습니다.";
+            if (Exec(c, tx, "UPDATE users SET money = money - $c WHERE id = $u AND money >= $c", ("$c", cost), ("$u", userId)) == 0)
+                return $"사이버머니가 {cost:N0} 이상 있어야 뽑을 수 있습니다.";
+            foreach (var item in items)
+                Exec(c, tx, "INSERT INTO inventory(user_id, item_id, count) VALUES ($u, $i, 1) ON CONFLICT(user_id, item_id) DO UPDATE SET count = count + 1",
+                    ("$u", userId), ("$i", item));
+            Ledger(c, tx, userId, "gacha", 0, -cost);
+            tx.Commit();
+            return null;
+        }
+
+        /// <summary>가진 꾸미기와 개수, 쓰고 있는지.</summary>
+        public List<(string item, int count, bool equipped)> Inventory(long userId)
+        {
+            using var c = Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "SELECT item_id, count, equipped FROM inventory WHERE user_id = $u AND count > 0 ORDER BY item_id";
+            cmd.Parameters.AddWithValue("$u", userId);
+            using var r = cmd.ExecuteReader();
+            var list = new List<(string, int, bool)>();
+            while (r.Read()) list.Add((r.GetString(0), r.GetInt32(1), r.GetInt32(2) == 1));
+            return list;
+        }
+
+        /// <summary>꾸미기를 쓴다(가진 것만). item이 null이면 벗는다. 성공하면 true.</summary>
+        public bool Equip(long userId, string item)
+        {
+            using var c = Open();
+            using var tx = c.BeginTransaction();
+            if (item != null && Scalar(c, tx, "SELECT 1 FROM inventory WHERE user_id = $u AND item_id = $i AND count > 0", ("$u", userId), ("$i", item)) == null) return false;
+            Exec(c, tx, "UPDATE inventory SET equipped = 0 WHERE user_id = $u", ("$u", userId));
+            if (item != null) Exec(c, tx, "UPDATE inventory SET equipped = 1 WHERE user_id = $u AND item_id = $i", ("$u", userId), ("$i", item));
+            tx.Commit();
+            return true;
+        }
+
+        public string EquippedItem(long userId)
+        {
+            using var c = Open();
+            return Scalar(c, null, "SELECT item_id FROM inventory WHERE user_id = $u AND equipped = 1", ("$u", userId)) as string;
         }
 
         /// <summary>검증용: 모든 사용자의 머니 + 테이블 stack 합계.</summary>

@@ -12,6 +12,11 @@
     <Compile Include="..\..\Assets\DiceHeist\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- 가챠 확률·보상 설정(사용자가 고친다). 실행 파일 옆으로 복사한다 -->
+  <ItemGroup>
+    <Content Update="gacha.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />

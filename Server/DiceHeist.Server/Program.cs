@@ -42,6 +42,22 @@ builder.Services.AddSingleton(new LoginGuard
     Window = TimeSpan.FromMinutes(security.GetValue("LockMinutes", 15.0)),
     RegistrationsPerHour = security.GetValue("RegistrationsPerHour", 20),
 });
+// 라이어 다이스(함정 의자, 2026-10-18): 브라우저 /liar/, 허브 /liarhub. 시간 제한은 설정 Liar:*Seconds로 바꿀 수 있다
+var liarCfg = builder.Configuration.GetSection("Liar");
+var liarTimings = new DiceHeist.Server.Liar.LiarTimings();
+liarTimings.Countdown = TimeSpan.FromSeconds(liarCfg.GetValue("CountdownSeconds", liarTimings.Countdown.TotalSeconds));
+liarTimings.Turn = TimeSpan.FromSeconds(liarCfg.GetValue("TurnSeconds", liarTimings.Turn.TotalSeconds));
+liarTimings.Lever = TimeSpan.FromSeconds(liarCfg.GetValue("LeverSeconds", liarTimings.Lever.TotalSeconds));
+liarTimings.Double = TimeSpan.FromSeconds(liarCfg.GetValue("DoubleSeconds", liarTimings.Double.TotalSeconds));
+builder.Services.AddSingleton(liarTimings);
+builder.Services.AddSingleton<DiceHeist.Server.Liar.LiarConnections>();
+builder.Services.AddSingleton(sp => new DiceHeist.Server.Liar.LiarManager(sp.GetRequiredService<Db>(), liarTimings));
+builder.Services.AddSingleton<DiceHeist.Server.Liar.LiarNotifier>();
+builder.Services.AddHostedService<DiceHeist.Server.Liar.LiarTicker>();
+// 가챠 설정(확률·보상은 사용자가 gacha.json에서 정한다). 경로는 설정 Gacha:Path(기본: 실행 파일 옆 gacha.json)
+string gachaPath = builder.Configuration["Gacha:Path"] ?? "gacha.json";
+if (!Path.IsPathRooted(gachaPath)) gachaPath = Path.Combine(builder.Environment.ContentRootPath, gachaPath);
+builder.Services.AddSingleton(GachaConfig.Load(gachaPath));
 builder.Services.AddSignalR();
 // SingleView 같은 Core의 화면용 클래스는 필드로 되어 있어(Unity JsonUtility와 같이 쓰려고) 필드도 JSON에 넣는다
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.IncludeFields = true);
@@ -58,6 +74,10 @@ if (refunded > 0) app.Logger.LogInformation("지난번 테이블에 남아 있�
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapHub<GameHub>("/hub");
+app.MapHub<DiceHeist.Server.Liar.LiarHub>("/liarhub");
+var liar = app.Services.GetRequiredService<DiceHeist.Server.Liar.LiarManager>();
+liar.SetNotifier(app.Services.GetRequiredService<DiceHeist.Server.Liar.LiarNotifier>());
+var gacha = app.Services.GetRequiredService<GachaConfig>();
 
 long? Auth(HttpRequest req)
 {
@@ -206,6 +226,35 @@ app.MapPost("/api/character", (HttpRequest req, CharacterRequest ch) =>
     return Profile(uid);
 });
 
+// ---------- 가챠(꾸미기). 사이버머니로만 뽑고 현금은 오가지 않는다. 확률은 gacha.json의 weight 비율 그대로 보여 준다 ----------
+object Inventory(long uid) => new
+{
+    money = db.GetUser(uid).Money,
+    equipped = db.EquippedItem(uid),
+    items = db.Inventory(uid).Select(x => new { id = x.item, x.count, x.equipped }).ToArray(),
+};
+app.MapGet("/api/gacha", () => gacha.Public());
+app.MapGet("/api/gacha/me", (HttpRequest req) => Auth(req) is long uid ? Results.Ok(Inventory(uid)) : Results.Unauthorized());
+app.MapPost("/api/gacha/pull", (HttpRequest req, GachaPullRequest p) =>
+{
+    if (Auth(req) is not long uid) return Results.Unauthorized();
+    int count = p?.Count == 10 ? 10 : 1;
+    long cost = count == 10 ? gacha.TenPullCost : gacha.Cost;
+    var got = Enumerable.Range(0, count).Select(_ => gacha.Draw()).ToList();
+    var err = db.GachaPull(uid, cost, got.Select(i => i.Id).ToList());
+    if (err != null) return Results.BadRequest(new { error = err });
+    return Results.Ok(new { results = got.Select(i => new { i.Id, i.Name, i.Icon, i.Rarity }).ToArray(), cost, inventory = Inventory(uid) });
+});
+app.MapPost("/api/gacha/equip", (HttpRequest req, GachaEquipRequest e) =>
+{
+    if (Auth(req) is not long uid) return Results.Unauthorized();
+    var item = string.IsNullOrEmpty(e?.Item) ? null : e.Item;
+    if (item != null && gacha.Find(item) == null) return Results.BadRequest(new { error = "없는 아이템입니다." });
+    if (!db.Equip(uid, item)) return Results.BadRequest(new { error = "가지고 있는 아이템만 쓸 수 있습니다." });
+    liar.HatChanged(uid, item);
+    return Results.Ok(Inventory(uid));
+});
+
 app.MapGet("/download/windows", () => File.Exists(windowsZip)
     ? Results.File(windowsZip, "application/zip", "DiceHeist-Windows.zip")
     : Results.NotFound());
@@ -226,6 +275,8 @@ public sealed record ExchangeRequest(int Amount);
 public sealed record PasswordChange(string Current, string Next);
 public sealed record CharacterRequest(string Character);
 public sealed record SitRequest(string Table);
+public sealed record GachaPullRequest(int Count);
+public sealed record GachaEquipRequest(string Item);
 public sealed record RerollRequest(bool[] Held);
 /// <param name="RaiseTo">레이즈일 때 이번 판 누적 금액. 0이면 기본 크기. 허용 범위 밖이면 Core가 맞춘다</param>
 public sealed record BetRequest(string Action, int RaiseTo = 0);

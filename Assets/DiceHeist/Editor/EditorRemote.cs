@@ -80,12 +80,14 @@ namespace DiceHeist.EditorTools
                     break;
                 default:
                     // "only <테스트 전체 이름>": 그 테스트(또는 클래스)만. [Explicit] 테스트도 이름으로 부르면 돈다
-                    if (cmd.StartsWith("only "))
+                    // "only-play <이름>"은 PlayMode 테스트를 이름으로
+                    if (cmd.StartsWith("only ") || cmd.StartsWith("only-play "))
                     {
+                        bool play = cmd.StartsWith("only-play ");
                         _api.Execute(new ExecutionSettings(new Filter
                         {
-                            testMode = TestMode.EditMode,
-                            groupNames = new[] { "^" + System.Text.RegularExpressions.Regex.Escape(cmd.Substring(5).Trim()) },
+                            testMode = play ? TestMode.PlayMode : TestMode.EditMode,
+                            groupNames = new[] { "^" + System.Text.RegularExpressions.Regex.Escape(cmd.Substring(play ? 10 : 5).Trim()) },
                         }));
                         break;
                     }

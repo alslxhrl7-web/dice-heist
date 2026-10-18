@@ -1,0 +1,24 @@
+{
+  "_설명": "가챠 설정. 확률과 보상은 사용자가 나중에 정한다(2026-10-18 결정). weight는 상대 비율(확률 = weight / 전체 합)이고 화면에 확률로 그대로 보인다. 현금 결제·환전은 없다: 사이버머니로만 뽑는다. 값을 바꾸면 서버를 다시 켜야 반영된다.",
+  "placeholder": true,
+  "cost": 10000,
+  "tenPullCost": 90000,
+  "rarities": [
+    { "id": "common", "name": "일반", "color": "#8b958f" },
+    { "id": "rare", "name": "희귀", "color": "#3b7dd8" },
+    { "id": "epic", "name": "영웅", "color": "#8a4fd0" },
+    { "id": "legend", "name": "전설", "color": "#e2a425" }
+  ],
+  "items": [
+    { "id": "cap", "name": "야구 모자", "icon": "🧢", "rarity": "common", "weight": 20 },
+    { "id": "ribbon", "name": "리본", "icon": "🎀", "rarity": "common", "weight": 20 },
+    { "id": "beanie", "name": "털모자", "icon": "🧶", "rarity": "common", "weight": 20 },
+    { "id": "helmet", "name": "안전모", "icon": "⛑️", "rarity": "rare", "weight": 10 },
+    { "id": "cowboy", "name": "카우보이 모자", "icon": "🤠", "rarity": "rare", "weight": 10 },
+    { "id": "grad", "name": "학사모", "icon": "🎓", "rarity": "rare", "weight": 8 },
+    { "id": "tophat", "name": "신사 모자", "icon": "🎩", "rarity": "epic", "weight": 5 },
+    { "id": "sunglasses", "name": "선글라스", "icon": "🕶️", "rarity": "epic", "weight": 4 },
+    { "id": "crown", "name": "왕관", "icon": "👑", "rarity": "legend", "weight": 2 },
+    { "id": "gem", "name": "보석 왕관", "icon": "💎", "rarity": "legend", "weight": 1 }
+  ]
+}

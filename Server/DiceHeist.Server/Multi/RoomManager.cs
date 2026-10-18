@@ -109,6 +109,7 @@ namespace DiceHeist.Server.Multi
             if (room.Seats.Count >= Room.MaxSeats) return "방이 꽉 찼습니다.";
             var user = _db.GetUser(userId);
             if (user == null) return "계정을 찾을 수 없습니다.";
+            if (_db.HasStack(userId)) return "다른 테이블(라이어 다이스)에 앉아 있습니다. 그 테이블에서 먼저 일어나 주세요.";
             if (!_db.BuyIn(userId, room.Id, Room.BuyIn)) return $"사이버머니가 {Room.BuyIn:N0} 이상 있어야 앉을 수 있습니다.";
             room.Sit(new RoomSeat
             {
