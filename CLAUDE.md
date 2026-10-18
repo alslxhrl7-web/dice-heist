@@ -52,7 +52,7 @@ Assets/DiceHeist/
 - 더블 오어 낫싱: 이긴 사람이 판돈을 금고 주사위에 건다. 4~6 두 배, 1~3 0, 연달아 최대 3번
 - 가챠: `Server/DiceHeist.Server/gacha.json`(placeholder: true, 임시 확률·가격) → `GachaConfig`. 확률 = weight / 합, 화면에 그대로 보인다. `/api/gacha`(확률), `/api/gacha/me`, `/api/gacha/pull {count:1|10}`(테이블에 앉아 있으면 못 뽑음), `/api/gacha/equip {item}`. DB `inventory` 표. 쓴 꾸미기는 자리 얼굴 위 아이콘
 - 시험: `LiarDiceTests`(Core), `LiarRoomTests`·`LiarFlowTests`(서버, 허브로 한 게임 끝까지·가챠). 로컬 시험 서버는 `.claude/launch.json`의 `liar-dev`(5090, scratchpad DB)
-- 서버 PC(desktop-5omono1)에서 저장소를 받고 `ServerdeployPdate-service.cmd`를 실행해야 서비스에 반영된다. 2026-10-18 작업 PC(P로딩)에도 시험 삼아 서비스가 설치돼 있다(외부 주소 없음, DB 비어 있음)
+- 서버 PC(desktop-5omono1)에서 저장소를 받고 `Server\deploy\update-service.cmd`를 실행해야 서비스에 반영된다. 2026-10-18 작업 PC(P로딩)에도 시험 삼아 서비스가 설치돼 있다(외부 주소 없음, DB 비어 있음)
 
 ## 멀티 서버 (Server/, 2026-10-14 1단계)
 
